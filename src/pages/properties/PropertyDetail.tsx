@@ -1,5 +1,5 @@
-
-import { useState } from "react";
+// src/pages/properties/PropertyDetail.tsx
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { 
   Card, 
@@ -47,127 +47,47 @@ import {
   Trash
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { useProperties } from "@/hooks/use-properties";
+import { useData } from "@/hooks/use-data"; // Importar useData
 import { useToast } from "@/hooks/use-toast";
 import { Property, CalendarEvent, AccessCode, MaintenanceRequest, Checklist } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { getPropertyById, removeProperty } = useProperties();
+  const { getPropertyById, removeProperty, getEventsByPropertyId, getAccessCodesByPropertyId, getMaintenanceRequestsByPropertyId, getChecklistsByPropertyId } = useData(); // Usar useData
   const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+
+  const property = id ? getPropertyById(id) : undefined;
   
-  // Load property data
-  const property = id ? getPropertyById(id) : null;
-  
-  // Mocked related data
-  const events: CalendarEvent[] = [
-    {
-      id: "1",
-      title: "Cleaning",
-      propertyId: id || "",
-      assignedTo: "user1",
-      startDate: new Date(2025, 4, 10, 9, 0).toISOString(),
-      endDate: new Date(2025, 4, 10, 11, 0).toISOString(),
-      type: "cleaning",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      title: "AC Maintenance",
-      propertyId: id || "",
-      startDate: new Date(2025, 4, 15, 13, 0).toISOString(),
-      endDate: new Date(2025, 4, 15, 15, 0).toISOString(),
-      type: "maintenance",
-      notes: "Check and clean the AC filters",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // Filtrar dados reais baseados no propertyId
+  const events = id ? getEventsByPropertyId(id) : [];
+  const accessCodes = id ? getAccessCodesByPropertyId(id) : [];
+  const maintenanceRequests = id ? getMaintenanceRequestsByPropertyId(id) : [];
+  const checklists = id ? getChecklistsByPropertyId(id) : [];
+
+  useEffect(() => {
+    // Definir loading como false quando a propriedade for carregada
+    if (property) {
+      setLoading(false);
+    } else {
+      // Se não houver propriedade, pode estar carregando ou não existe
+      const timer = setTimeout(() => {
+        if (!property) {
+          setLoading(false); // Assume que a propriedade não foi encontrada
+        }
+      }, 1000); // Dar um tempo para o fetch inicial
+      return () => clearTimeout(timer);
     }
-  ];
+  }, [id, property]);
   
-  const accessCodes: AccessCode[] = [
-    {
-      id: "1",
-      propertyId: id || "",
-      code: "1234",
-      name: "Front Door",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      expiryDate: new Date(2025, 10, 1).toISOString(),
-    },
-    {
-      id: "2",
-      propertyId: id || "",
-      code: "5678",
-      name: "Garage",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
-  
-  const maintenanceRequests: MaintenanceRequest[] = [
-    {
-      id: "1",
-      title: "Leaking Faucet",
-      description: "The kitchen sink faucet is leaking",
-      propertyId: id || "",
-      status: "open",
-      priority: "medium",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      title: "Replace Light Bulbs",
-      description: "Living room lights need replacement",
-      propertyId: id || "",
-      assignedTo: "user2",
-      status: "completed",
-      priority: "low",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-    },
-  ];
-  
-  const checklists: Checklist[] = [
-    {
-      id: "1",
-      title: "Standard Cleaning",
-      propertyId: id || "",
-      type: "checkout",
-      items: [
-        { id: "1-1", text: "Clean bathrooms", completed: true },
-        { id: "1-2", text: "Vacuum floors", completed: true },
-        { id: "1-3", text: "Empty trash", completed: false },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      title: "Pre-arrival Checklist",
-      propertyId: id || "",
-      type: "checkin",
-      items: [
-        { id: "2-1", text: "Stock toiletries", completed: true },
-        { id: "2-2", text: "Check appliances", completed: true },
-        { id: "2-3", text: "Replace towels", completed: true },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-    },
-  ];
-  
-  // Handle property deletion
-  const handleDeleteProperty = () => {
+  const handleDeleteProperty = async () => {
     if (!id) return;
     
     try {
-      removeProperty(id);
+      await removeProperty(id);
       toast({
         title: "Property Deleted",
         description: "The property has been deleted successfully.",
@@ -182,6 +102,19 @@ export default function PropertyDetail() {
     }
   };
   
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-full mb-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="h-[300px]"><Skeleton className="h-full w-full" /></Card>
+          <Card className="h-[300px]"><Skeleton className="h-full w-full" /></Card>
+        </div>
+        <Skeleton className="h-[200px] w-full" />
+      </div>
+    );
+  }
+
   if (!property) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -320,7 +253,7 @@ export default function PropertyDetail() {
                   <p className="text-muted-foreground text-center py-6">No upcoming events</p>
                 ) : (
                   <div className="space-y-4">
-                    {events.map((event) => (
+                    {events.slice(0,2).map((event) => ( {/* Limitar a 2 eventos para o overview */}
                       <div key={event.id} className="flex items-start">
                         <div className="mr-4 p-2 border rounded-md">
                           <Calendar className="h-5 w-5 text-muted-foreground" />

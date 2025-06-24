@@ -1,4 +1,4 @@
-
+// src/pages/properties/PropertyForm.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -23,68 +23,12 @@ import {
 import { Property } from "@/types";
 import { AlertCircle, ArrowLeft, Building } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useData } from "@/hooks/use-data"; // Importar useData
+import { useToast } from "@/hooks/use-toast"; // Importar useToast
 
-// Mock properties data
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: "1",
-    name: "Oceanview Apartment",
-    address: "123 Coastal Highway",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33101",
-    bedrooms: 2,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8bHV4dXJ5JTIwYXBhcnRtZW50fGVufDB8fDB8fA%3D%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Beautiful oceanfront apartment with stunning views",
-    createdAt: "2023-01-15T00:00:00.000Z",
-    updatedAt: "2023-01-15T00:00:00.000Z"
-  },
-  {
-    id: "2",
-    name: "Downtown Loft",
-    address: "456 Main Street",
-    city: "Chicago",
-    state: "IL",
-    zipCode: "60601",
-    bedrooms: 1,
-    bathrooms: 1,
-    imageUrl: "https://images.unsplash.com/photo-1560448075-32cafe5eb046?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NHx8bG9mdHxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Modern loft in the heart of downtown",
-    createdAt: "2023-02-10T00:00:00.000Z",
-    updatedAt: "2023-02-10T00:00:00.000Z"
-  },
-  {
-    id: "3",
-    name: "Mountain Retreat",
-    address: "789 Alpine Road",
-    city: "Aspen",
-    state: "CO",
-    zipCode: "81611",
-    bedrooms: 3,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8bW91bnRhaW4lMjBob21lfGVufDB8fDB8fA%3D%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Cozy cabin with breathtaking mountain views",
-    createdAt: "2023-03-05T00:00:00.000Z",
-    updatedAt: "2023-03-05T00:00:00.000Z"
-  },
-  {
-    id: "4",
-    name: "Beachfront Villa",
-    address: "101 Ocean Drive",
-    city: "San Diego",
-    state: "CA",
-    zipCode: "92109",
-    bedrooms: 4,
-    bathrooms: 3,
-    imageUrl: "https://images.unsplash.com/photo-1577495508048-b635879837f1?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8YmVhY2glMjB2aWxsYXxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Luxurious villa with direct beach access",
-    createdAt: "2023-04-20T00:00:00.000Z",
-    updatedAt: "2023-04-20T00:00:00.000Z"
-  }
-];
+// Removido MOCK_PROPERTIES
+// Removido US_STATES - pode ser movido para um arquivo de constantes ou diretamente no código
 
-// List of US states for dropdown
 const US_STATES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", 
   "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
@@ -96,7 +40,9 @@ export default function PropertyForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
-  
+  const { getPropertyById, addProperty, updateProperty } = useData(); // Obter funções do useData
+  const { toast } = useToast();
+
   const [formData, setFormData] = useState<Partial<Property>>({
     name: "",
     address: "",
@@ -115,20 +61,23 @@ export default function PropertyForm() {
   
   useEffect(() => {
     if (isEditing) {
-      // Simulate API call to get property by ID
-      const timer = setTimeout(() => {
-        const property = MOCK_PROPERTIES.find(p => p.id === id);
-        if (property) {
-          setFormData(property);
-        } else {
-          setError("Property not found");
-        }
-        setLoading(false);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+      const property = getPropertyById(id);
+      if (property) {
+        setFormData(property);
+      } else {
+        setError("Property not found");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Property not found.",
+        });
+        navigate("/properties"); // Redirecionar se não encontrar
+      }
+      setLoading(false);
+    } else {
+      setLoading(false); // Não está em modo de edição, então não está carregando
     }
-  }, [id, isEditing]);
+  }, [id, isEditing, getPropertyById, navigate, toast]);
   
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -141,7 +90,7 @@ export default function PropertyForm() {
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
+    setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 })); // Use parseFloat para banheiros
   };
   
   const handleSelectChange = (name: string, value: string) => {
@@ -154,24 +103,32 @@ export default function PropertyForm() {
     setSubmitting(true);
     
     try {
-      // Validate form
-      if (!formData.name || !formData.address || !formData.city || !formData.state || !formData.zipCode) {
-        throw new Error("Please fill in all required fields");
+      if (!formData.name || !formData.address || !formData.city || !formData.state || !formData.zipCode || formData.bedrooms === undefined || formData.bathrooms === undefined) {
+        throw new Error("Please fill in all required fields and ensure bedrooms/bathrooms are numbers.");
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (isEditing) {
+        await updateProperty(formData as Property); // 'formData' deve ser um tipo 'Property' completo para update
+      } else {
+        await addProperty(formData); // 'formData' pode ser Partial<Property> para add
+      }
       
-      // In a real app, this would send data to the server
-      console.log("Submitting property:", formData);
-      
-      // Navigate back to properties list after success
       navigate("/properties");
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to save property: ${err.message}`,
+        });
       } else {
         setError("An unexpected error occurred");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "An unexpected error occurred while saving the property.",
+        });
       }
     } finally {
       setSubmitting(false);

@@ -1,4 +1,4 @@
-
+// src/pages/profile/ProfilePage.tsx
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -14,13 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Moon, Sun, Languages } from "lucide-react";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
+import { useData } from "@/hooks/use-data"; // Importar useData
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -35,10 +36,11 @@ const profileFormSchema = z.object({
 });
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, login } = useAuth(); // Obter user do useAuth
   const { theme, toggleTheme, language, setLanguage } = useSettings();
   const { t } = useTranslation();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { updateEmployee } = useData(); // Obter updateEmployee do useData
+  const [isSubmitting, setIsSubmitting] = useState(false); // Manter este estado local para feedback do formulário
 
   const form = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
@@ -47,21 +49,68 @@ export default function ProfilePage() {
       email: user?.email || "",
       phone: user?.phone || "",
     },
+    // Resetar o formulário quando o usuário muda (se aplicável, ou ao carregar)
+    values: { // Use `values` para controlar o formulário com dados externos
+      name: user?.name || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+    }
   });
 
   const onSubmit = async (values: z.infer<typeof profileFormSchema>) => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "User not authenticated.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // In a real app, this would be an actual API call to update the user's profile
-    toast({
-      title: "Profile updated",
-      description: "Your profile has been updated successfully.",
-    });
-    
-    setIsSubmitting(false);
+
+    try {
+      // Assumindo que o perfil do usuário corresponde a um registro na tabela 'employees'
+      // E que o ID do usuário Supabase é o mesmo ID na tabela 'employees'
+      await updateEmployee({
+        id: user.id,
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        role: user.role, // Manter o role atual do usuário
+        startDate: user.startDate || new Date().toISOString(), // Pode precisar buscar ou adicionar esta info ao tipo User
+        properties: user.properties || [], // Pode precisar buscar ou adicionar esta info ao tipo User
+        // createdAt e updatedAt serão gerenciados pelo Supabase
+      });
+
+      // Se o email ou nome mudar, você pode querer atualizar o user_metadata no Supabase Auth também
+      // Isso dependerá da sua implementação do AuthContext e de como você mantém esses dados sincronizados.
+      const { error: updateAuthError } = await supabase.auth.updateUser({
+          email: values.email,
+          data: { name: values.name, phone: values.phone }
+      });
+
+      if (updateAuthError) throw updateAuthError;
+
+      // Se o email ou nome mudar, o AuthContext deve re-sincronizar os dados do usuário.
+      // Uma solução rápida (não ideal para todos os casos) é forçar uma re-validação ou re-login "silencioso".
+      // Ou garantir que o onAuthStateChange no AuthContext lide com updates de user_metadata.
+      // Por simplicidade, faremos um toast de sucesso.
+
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+    } catch (error: any) {
+      console.error("Error updating profile:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update profile. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-
+// src/pages/auth/Login.tsx
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,8 +21,8 @@ export default function Login() {
     
     try {
       await login(email, password);
-    } catch (err) {
-      setError("Invalid email or password");
+    } catch (err: any) { // Capture o erro para exibir a mensagem
+      setError(err.message || "Invalid email or password");
     }
   };
 

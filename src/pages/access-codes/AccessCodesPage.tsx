@@ -1,8 +1,9 @@
-
+// src/pages/access-codes/AccessCodesPage.tsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/use-translation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/hooks/use-data"; // Importar useData
 import { 
   Card, 
   CardContent, 
@@ -23,78 +24,41 @@ import {
 import { AccessCode, Property } from "@/types";
 import { Plus, Search, Edit, Building } from "lucide-react";
 import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
 
-// Mock data for access codes
-const MOCK_ACCESS_CODES: AccessCode[] = [
-  {
-    id: "1",
-    propertyId: "1",
-    code: "1234",
-    name: "Front Door",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "2",
-    propertyId: "1",
-    code: "5678",
-    name: "Garage",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    propertyId: "2",
-    code: "9876",
-    name: "Main Entrance",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    expiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-// Mock data for properties
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: "1",
-    name: "Beach House",
-    address: "123 Ocean Drive",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33139",
-    bedrooms: 3,
-    bathrooms: 2,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Mountain Cabin",
-    address: "45 Alpine Road",
-    city: "Aspen",
-    state: "CO",
-    zipCode: "81611",
-    bedrooms: 2,
-    bathrooms: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+// Removidos MOCK_ACCESS_CODES e MOCK_PROPERTIES
 
 export default function AccessCodesPage() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
+  const { accessCodes, properties, removeAccessCode } = useData(); // Obter dados e funções do useData
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Get the property name by ID
   const getPropertyName = (propertyId: string): string => {
-    const property = MOCK_PROPERTIES.find(p => p.id === propertyId);
-    return property ? property.name : "Unknown Property";
+    const property = properties[propertyId]; // Usar properties do useData
+    return property ? property.name : t("calendar.unknownProperty");
   };
 
+  useEffect(() => {
+    // Definir loading como false quando os access codes forem carregados
+    if (Object.keys(accessCodes).length > 0) {
+      setLoading(false);
+    } else {
+      const timer = setTimeout(() => {
+        if (Object.keys(accessCodes).length === 0) {
+          setLoading(false);
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [accessCodes]);
+
+  const accessCodesArray = Object.values(accessCodes); // Converte o objeto em array
+
   // Filter access codes based on search term
-  const filteredCodes = MOCK_ACCESS_CODES.filter(code => {
+  const filteredCodes = accessCodesArray.filter(code => {
     const propertyName = getPropertyName(code.propertyId);
     return (
       code.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,6 +66,10 @@ export default function AccessCodesPage() {
       propertyName.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
+
+  const handleDelete = async (id: string) => {
+    await removeAccessCode(id);
+  };
 
   return (
     <div className="space-y-6">
@@ -140,25 +108,33 @@ export default function AccessCodesPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("accessCodes.property")}</TableHead>
-                <TableHead>{t("accessCodes.codeName")}</TableHead>
-                <TableHead>{t("accessCodes.code")}</TableHead>
-                <TableHead>{t("accessCodes.expiryDate")}</TableHead>
-                {hasPermission("edit:accessCodes") && <TableHead className="w-[100px]">{t("common.actions")}</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCodes.length === 0 ? (
+          {loading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : filteredCodes.length === 0 ? (
+            <div className="text-center py-6">
+              <Building className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-2 text-lg font-semibold">No access codes found</h3>
+              <p className="text-muted-foreground">
+                {searchQuery ? "Try adjusting your search terms" : "Add an access code to get started"}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={hasPermission("edit:accessCodes") ? 5 : 4} className="text-center py-6">
-                    No access codes found
-                  </TableCell>
+                  <TableHead>{t("accessCodes.property")}</TableHead>
+                  <TableHead>{t("accessCodes.codeName")}</TableHead>
+                  <TableHead>{t("accessCodes.code")}</TableHead>
+                  <TableHead>{t("accessCodes.expiryDate")}</TableHead>
+                  {hasPermission("edit:accessCodes") && <TableHead className="w-[100px]">{t("common.actions")}</TableHead>}
                 </TableRow>
-              ) : (
-                filteredCodes.map((code) => (
+              </TableHeader>
+              <TableBody>
+                {filteredCodes.map((code) => (
                   <TableRow key={code.id}>
                     <TableCell className="flex items-center gap-2">
                       <Building className="h-4 w-4 text-muted-foreground" />
@@ -178,13 +154,21 @@ export default function AccessCodesPage() {
                             <Edit className="h-4 w-4" />
                           </Link>
                         </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(code.id)}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     )}
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,3 +1,4 @@
+// src/pages/checklists/ChecklistForm.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { 
@@ -18,7 +19,7 @@ import {
   FormLabel,
   FormMessage
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Input } = "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Select,
@@ -31,7 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import {
-  AlertDialog,
+  AlertDialog, // Importado mas não usado no código atual
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -47,11 +48,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/use-translation";
-import { useProperties } from "@/hooks/use-properties";
-import { useEmployees } from "@/hooks/use-employees";
+// Removidos useProperties e useEmployees para usar diretamente do useData
 import { useData } from "@/hooks/use-data";
 import { Checklist, ChecklistItem, COMMON_CHECKLIST_ITEMS } from "@/types";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4 } from "uuid"; // Apenas se o DB não gerar IDs
 
 // Form validation schema
 const formSchema = z.object({
@@ -116,42 +116,13 @@ export default function ChecklistForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  const { properties, allProperties } = useProperties();
-  const { allEmployees } = useEmployees();
-  const { getChecklistById, updateChecklist, addChecklist } = useData();
+  const { properties: allProperties, employees: allEmployees, getChecklistById, updateChecklist, addChecklist } = useData();
   
-  // Form state
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [newItemText, setNewItemText] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState<string>("all");
-  
-  useEffect(() => {
-    // Simulate API calls
-
-    // If editing an existing checklist
-    if (id) {
-      const checklist = getChecklistById(id);
-      if (checklist) {
-        form.reset({
-          title: checklist.title,
-          propertyId: checklist.propertyId,
-          assignedTo: checklist.assignedTo || "",
-          type: checklist.type,
-        });
-        setItems(checklist.items);
-      } else {
-        // Handle checklist not found
-        setError("Checklist not found");
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "The requested checklist could not be found.",
-        });
-      }
-    }
-  }, [id]);
+  const [selectedRegion, setSelectedRegion] = useState<string>("all"); // Não usado no código atual, pode ser removido se não houver lógica de filtro de região aqui
   
   // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
@@ -163,16 +134,37 @@ export default function ChecklistForm() {
       type: "checkout" as const,
     },
   });
+
+  useEffect(() => {
+    // Se estiver em modo de edição, carregue os dados do checklist
+    if (id) {
+      const checklist = getChecklistById(id);
+      if (checklist) {
+        form.reset({
+          title: checklist.title,
+          propertyId: checklist.propertyId,
+          assignedTo: checklist.assignedTo || "",
+          type: checklist.type,
+        });
+        setItems(checklist.items);
+      } else {
+        setError("Checklist not found");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "The requested checklist could not be found.",
+        });
+        navigate("/checklists"); // Redireciona se não encontrar o checklist
+      }
+    }
+  }, [id, getChecklistById, navigate, form, toast]);
   
-  // Load template items
   const loadTemplate = (templateId: string) => {
     const template = checklistTemplates.find(t => t.id === templateId);
     if (template) {
-      // Create new items with unique IDs
       const newItems = template.items.map(item => ({
-        id: uuidv4(),
-        text: item.text,
-        completed: false
+        ...item,
+        id: uuidv4(), // Garante que os IDs dos itens do template sejam únicos
       }));
       setItems(newItems);
       toast({
@@ -182,7 +174,6 @@ export default function ChecklistForm() {
     }
   };
   
-  // Add a new item to the checklist
   const addItem = () => {
     if (newItemText.trim() === "") return;
     
@@ -196,12 +187,10 @@ export default function ChecklistForm() {
     setNewItemText("");
   };
   
-  // Remove an item from the checklist
   const removeItem = (id: string) => {
     setItems(items.filter(item => item.id !== id));
   };
   
-  // Toggle item completion
   const toggleItem = (id: string) => {
     setItems(
       items.map(item =>
@@ -210,7 +199,6 @@ export default function ChecklistForm() {
     );
   };
   
-  // Form submission handler
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (items.length === 0) {
       toast({
@@ -225,43 +213,40 @@ export default function ChecklistForm() {
     setError("");
     
     try {
-      const checklistData: Checklist = {
-        id: id || uuidv4(),
+      const checklistData: Partial<Checklist> = {
         title: values.title,
         propertyId: values.propertyId,
-        assignedTo: values.assignedTo || undefined,
+        assignedTo: values.assignedTo === "unassigned" ? undefined : values.assignedTo, // 'unassigned' para undefined
         type: values.type,
         items: items,
-        createdAt: id ? (getChecklistById(id)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        completedAt: undefined
+        // createdAt e updatedAt serão gerenciados pelo DataContext/Supabase
+        // completedAt também será gerenciado quando o checklist for finalizado
       };
       
       if (id) {
-        // Update existing checklist
-        updateChecklist(checklistData);
-        toast({
-          title: "Success",
-          description: "Checklist updated successfully.",
-        });
+        await updateChecklist({ ...checklistData, id: id } as Checklist); // Passa o ID para a atualização
       } else {
-        // Create new checklist
-        addChecklist(checklistData);
-        toast({
-          title: "Success",
-          description: "Checklist created successfully.",
-        });
+        await addChecklist(checklistData);
       }
       
       navigate("/checklists");
-    } catch (error) {
-      console.error("Error saving checklist:", error);
-      setError("Failed to save checklist. Please try again.");
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save checklist. Please try again.",
-      });
+    } catch (err) {
+      console.error("Error saving checklist:", err);
+      if (err instanceof Error) {
+        setError(err.message);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to save checklist: ${err.message}`,
+        });
+      } else {
+        setError("An unexpected error occurred");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to save checklist. Please try again.",
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -314,7 +299,7 @@ export default function ChecklistForm() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {allProperties.map((property) => (
+                          {Object.values(allProperties).map((property) => (
                             <SelectItem key={property.id} value={property.id}>
                               {property.name}
                             </SelectItem>
@@ -332,7 +317,11 @@ export default function ChecklistForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assigned To</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value || "unassigned"} // Default para "unassigned"
+                        value={field.value || "unassigned"}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select an assignee" />
@@ -342,7 +331,7 @@ export default function ChecklistForm() {
                           <SelectItem value="unassigned">
                             Unassigned
                           </SelectItem>
-                          {allEmployees.map((employee) => (
+                          {Object.values(allEmployees).map((employee) => (
                             <SelectItem key={employee.id} value={employee.id}>
                               {employee.name}
                             </SelectItem>

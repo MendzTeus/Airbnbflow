@@ -1,12 +1,13 @@
+// src/pages/calendar/CalendarPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { 
-  format, 
-  startOfWeek, 
-  endOfWeek, 
-  addWeeks, 
-  subWeeks, 
-  startOfMonth, 
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  subWeeks,
+  startOfMonth,
   endOfMonth,
   addMonths,
   subMonths,
@@ -25,10 +26,10 @@ import {
   setMinutes,
   subDays
 } from "date-fns";
-import { 
-  CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Plus,
   ArrowUpDown,
@@ -81,125 +82,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/hooks/use-translation";
-import { useData } from "@/hooks/use-data";
-import { useToast } from "@/hooks/use-toast";
+import { useData } from "@/hooks/use-data"; // Importar useData
+import { useToast } from "@/hooks/use-toast"; // Importar useToast
 import { CalendarEvent, Property, Employee } from "@/types";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4 } from "uuid"; // Para gerar IDs no front-end, se necessário (o Supabase pode gerar no backend)
 
-// Mock data
-const MOCK_EVENTS: CalendarEvent[] = [
-  {
-    id: "event1",
-    title: "Property Cleaning",
-    propertyId: "prop1",
-    assignedTo: "emp1",
-    startDate: new Date(2025, 4, 5, 10, 0).toISOString(),
-    endDate: new Date(2025, 4, 5, 12, 0).toISOString(),
-    type: "cleaning",
-    notes: "Deep clean after checkout",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "event2",
-    title: "Fix A/C Unit",
-    propertyId: "prop2",
-    assignedTo: "emp2",
-    startDate: new Date(2025, 4, 6, 14, 0).toISOString(),
-    endDate: new Date(2025, 4, 6, 16, 0).toISOString(),
-    type: "maintenance",
-    notes: "A/C not cooling properly, tenant reported high temperatures",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "event3",
-    title: "Property Cleaning",
-    propertyId: "prop1",
-    assignedTo: "emp1",
-    startDate: new Date(2025, 4, 7, 10, 0).toISOString(),
-    endDate: new Date(2025, 4, 7, 12, 0).toISOString(),
-    type: "cleaning",
-    notes: "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "event4",
-    title: "Plumbing Repair",
-    propertyId: "prop3",
-    assignedTo: "emp2",
-    startDate: new Date(2025, 4, 10, 13, 0).toISOString(),
-    endDate: new Date(2025, 4, 10, 15, 0).toISOString(),
-    type: "maintenance",
-    notes: "Sink leaking in master bathroom",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: "prop1",
-    name: "Luxury Downtown Apt",
-    address: "123 Main St",
-    city: "San Francisco",
-    state: "CA",
-    region: "Downtown",
-    zipCode: "94105",
-    bedrooms: 2,
-    bathrooms: 2,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prop2",
-    name: "Beach House",
-    address: "456 Ocean Dr",
-    city: "Malibu",
-    state: "CA",
-    region: "Beach",
-    zipCode: "90265",
-    bedrooms: 3,
-    bathrooms: 2,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prop3",
-    name: "Mountain Cabin",
-    address: "789 Pine Rd",
-    city: "Aspen",
-    state: "CO",
-    region: "Mountain",
-    zipCode: "81611",
-    bedrooms: 4,
-    bathrooms: 3,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const MOCK_EMPLOYEES: Employee[] = [
-  {
-    id: "emp1",
-    name: "John Doe",
-    email: "john@example.com",
-    phone: "555-123-4567",
-    role: "cleaner",
-    startDate: new Date().toISOString(),
-    properties: ["prop1", "prop2"],
-  },
-  {
-    id: "emp2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    phone: "555-987-6543",
-    role: "manager",
-    startDate: new Date().toISOString(),
-    properties: ["prop1", "prop3"],
-  },
-];
+// Removido mock data, agora buscado via useData
+// const MOCK_EVENTS: CalendarEvent[] = [...];
+// const MOCK_PROPERTIES: Property[] = [...];
+// const MOCK_EMPLOYEES: Employee[] = [...];
 
 // Calendar view options
 type ViewType = "month" | "week" | "day";
@@ -223,12 +114,13 @@ type QuickAddEventType = {
 function CalendarPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  // Obter dados e funções de manipulação do useData
   const { events, properties, employees, addEvent, updateEvent, removeEvent } = useData();
-  
-  // Use mock data if the real data is not available
-  const allEvents = events && Object.keys(events).length > 0 ? Object.values(events) : MOCK_EVENTS;
-  const allProperties = properties && Object.keys(properties).length > 0 ? Object.values(properties) : MOCK_PROPERTIES;
-  const allEmployees = employees && Object.keys(employees).length > 0 ? Object.values(employees) : MOCK_EMPLOYEES;
+
+  // Converter objetos em arrays para facilitar o uso nos componentes de lista/dropdown
+  const allEvents = useMemo(() => Object.values(events), [events]);
+  const allProperties = useMemo(() => Object.values(properties), [properties]);
+  const allEmployees = useMemo(() => Object.values(employees), [employees]);
 
   // Calendar state
   const [date, setDate] = useState<Date>(new Date());
@@ -238,7 +130,7 @@ function CalendarPage() {
     employees: [],
     types: ["cleaning", "maintenance"],
   });
-  
+
   // Quick add event dialog
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddEvent, setQuickAddEvent] = useState<QuickAddEventType>({
@@ -251,25 +143,25 @@ function CalendarPage() {
     type: "cleaning",
     notes: "",
   });
-  
+
   // Event detail dialog
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [eventDetailOpen, setEventDetailOpen] = useState(false);
-  
-  // Edit event state
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedEvent, setEditedEvent] = useState<any>(null);
-  
+
+  // Edit event state (agora usado para preencher o formulário de detalhes/edição)
+  const [editedEvent, setEditedEvent] = useState<QuickAddEventType | null>(null);
+
+
   // Helper function to get property by ID
   const getPropertyById = (id: string) => {
     return allProperties.find(p => p.id === id) || null;
   };
-  
+
   // Helper function to get employee by ID
   const getEmployeeById = (id: string) => {
     return allEmployees.find(e => e.id === id) || null;
   };
-  
+
   // Filter events based on current filters
   const filteredEvents = useMemo(() => {
     return allEvents.filter(event => {
@@ -277,21 +169,21 @@ function CalendarPage() {
       if (filters.properties.length > 0 && !filters.properties.includes(event.propertyId)) {
         return false;
       }
-      
+
       // Filter by employee
       if (filters.employees.length > 0 && event.assignedTo && !filters.employees.includes(event.assignedTo)) {
         return false;
       }
-      
+
       // Filter by type
       if (filters.types.length > 0 && !filters.types.includes(event.type)) {
         return false;
       }
-      
+
       return true;
     });
   }, [allEvents, filters]);
-  
+
   // Get events for the current view
   const currentViewEvents = useMemo(() => {
     switch (view) {
@@ -302,7 +194,7 @@ function CalendarPage() {
           const eventStart = parseISO(event.startDate);
           return isWithinInterval(eventStart, { start, end });
         });
-      
+
       case "week":
         const weekStart = startOfWeek(date, { weekStartsOn: 0 });
         const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
@@ -310,18 +202,18 @@ function CalendarPage() {
           const eventStart = parseISO(event.startDate);
           return isWithinInterval(eventStart, { start: weekStart, end: weekEnd });
         });
-      
+
       case "day":
         return filteredEvents.filter(event => {
           const eventStart = parseISO(event.startDate);
           return isSameDay(eventStart, date);
         });
-      
+
       default:
         return [];
     }
   }, [filteredEvents, date, view]);
-  
+
   // Calendar navigation methods
   const navigateNext = () => {
     switch (view) {
@@ -336,7 +228,7 @@ function CalendarPage() {
         break;
     }
   };
-  
+
   const navigatePrev = () => {
     switch (view) {
       case "month":
@@ -350,11 +242,11 @@ function CalendarPage() {
         break;
     }
   };
-  
+
   const navigateToday = () => {
     setDate(new Date());
   };
-  
+
   // Format date range for display
   const getDateRangeText = () => {
     switch (view) {
@@ -371,9 +263,9 @@ function CalendarPage() {
         return "";
     }
   };
-  
+
   // Handle quick add event submission
-  const handleQuickAddSubmit = () => {
+  const handleQuickAddSubmit = async () => {
     if (!quickAddEvent.title || !quickAddEvent.propertyId || !quickAddEvent.type) {
       toast({
         variant: "destructive",
@@ -382,14 +274,14 @@ function CalendarPage() {
       });
       return;
     }
-    
+
     // Parse time strings to create Date objects
     const [startHours, startMinutes] = quickAddEvent.startTime.split(":").map(Number);
     const [endHours, endMinutes] = quickAddEvent.endTime.split(":").map(Number);
-    
+
     const startDate = setMinutes(setHours(quickAddEvent.date, startHours), startMinutes);
     const endDate = setMinutes(setHours(quickAddEvent.date, endHours), endMinutes);
-    
+
     // Ensure end time is after start time
     if (isAfter(startDate, endDate)) {
       toast({
@@ -399,9 +291,9 @@ function CalendarPage() {
       });
       return;
     }
-    
+
     const newEvent: CalendarEvent = {
-      id: uuidv4(),
+      id: uuidv4(), // Gerar UUID no frontend, ou remover se o Supabase gerar automaticamente
       title: quickAddEvent.title,
       propertyId: quickAddEvent.propertyId,
       assignedTo: quickAddEvent.assignedTo || undefined,
@@ -409,47 +301,58 @@ function CalendarPage() {
       endDate: endDate.toISOString(),
       type: quickAddEvent.type,
       notes: quickAddEvent.notes,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(), // Será sobrescrito pelo Supabase se tiver default `now()`
+      updatedAt: new Date().toISOString(), // Será sobrescrito pelo Supabase se tiver default `now()`
     };
-    
-    addEvent(newEvent);
-    
-    toast({
-      title: "Event Added",
-      description: "Your event has been added to the calendar.",
-    });
-    
-    // Reset form and close dialog
-    setQuickAddEvent({
-      title: "",
-      propertyId: "",
-      assignedTo: "",
-      date: new Date(),
-      startTime: "09:00",
-      endTime: "10:00",
-      type: "cleaning",
-      notes: "",
-    });
-    setQuickAddOpen(false);
+
+    try {
+      await addEvent(newEvent); // Usar a função addEvent do useData
+      toast({
+        title: "Event Added",
+        description: "Your event has been added to the calendar.",
+      });
+
+      // Reset form and close dialog
+      setQuickAddEvent({
+        title: "",
+        propertyId: "",
+        assignedTo: "",
+        date: new Date(),
+        startTime: "09:00",
+        endTime: "10:00",
+        type: "cleaning",
+        notes: "",
+      });
+      setQuickAddOpen(false);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error adding event",
+        description: (error as Error).message,
+      });
+    }
   };
-  
+
   // Handle event click to show details
   const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event);
     setEditedEvent({
-      ...event,
+      title: event.title,
+      propertyId: event.propertyId,
+      assignedTo: event.assignedTo || "",
       date: parseISO(event.startDate),
       startTime: format(parseISO(event.startDate), "HH:mm"),
       endTime: format(parseISO(event.endDate), "HH:mm"),
+      type: event.type,
+      notes: event.notes || "",
     });
     setEventDetailOpen(true);
   };
-  
+
   // Handle edit event submission
-  const handleEditSubmit = () => {
-    if (!editedEvent) return;
-    
+  const handleEditSubmit = async () => {
+    if (!selectedEvent || !editedEvent) return;
+
     if (!editedEvent.title || !editedEvent.propertyId || !editedEvent.type) {
       toast({
         variant: "destructive",
@@ -458,14 +361,14 @@ function CalendarPage() {
       });
       return;
     }
-    
+
     // Parse time strings to create Date objects
     const [startHours, startMinutes] = editedEvent.startTime.split(":").map(Number);
     const [endHours, endMinutes] = editedEvent.endTime.split(":").map(Number);
-    
+
     const startDate = setMinutes(setHours(editedEvent.date, startHours), startMinutes);
     const endDate = setMinutes(setHours(editedEvent.date, endHours), endMinutes);
-    
+
     // Ensure end time is after start time
     if (isAfter(startDate, endDate)) {
       toast({
@@ -475,9 +378,9 @@ function CalendarPage() {
       });
       return;
     }
-    
+
     const updatedEvent: CalendarEvent = {
-      id: editedEvent.id,
+      ...selectedEvent, // Manter o ID original
       title: editedEvent.title,
       propertyId: editedEvent.propertyId,
       assignedTo: editedEvent.assignedTo || undefined,
@@ -485,53 +388,52 @@ function CalendarPage() {
       endDate: endDate.toISOString(),
       type: editedEvent.type,
       notes: editedEvent.notes,
-      createdAt: editedEvent.createdAt,
-      updatedAt: new Date().toISOString(),
+      // createdAt e updatedAt serão gerenciados pelo Supabase
     };
-    
-    updateEvent(updatedEvent);
-    
-    toast({
-      title: "Event Updated",
-      description: "Your event has been updated.",
-    });
-    
-    // Reset form and close dialog
-    setEventDetailOpen(false);
-    setIsEditing(false);
-    setSelectedEvent(null);
-    setEditedEvent(null);
-  };
-  
-  // Handle event deletion
-  const handleDeleteEvent = () => {
-    if (!selectedEvent) return;
-    
-    removeEvent(selectedEvent.id);
-    
-    toast({
-      title: "Event Deleted",
-      description: "Your event has been deleted.",
-    });
-    
-    // Close dialog
-    setEventDetailOpen(false);
-    setSelectedEvent(null);
-  };
-  
-  // Reset edit mode
-  const cancelEdit = () => {
-    if (selectedEvent) {
-      setEditedEvent({
-        ...selectedEvent,
-        date: parseISO(selectedEvent.startDate),
-        startTime: format(parseISO(selectedEvent.startDate), "HH:mm"),
-        endTime: format(parseISO(selectedEvent.endDate), "HH:mm"),
+
+    try {
+      await updateEvent(updatedEvent); // Usar a função updateEvent do useData
+      toast({
+        title: "Event Updated",
+        description: "Your event has been updated.",
+      });
+
+      // Close dialog
+      setEventDetailOpen(false);
+      setSelectedEvent(null);
+      setEditedEvent(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error updating event",
+        description: (error as Error).message,
       });
     }
-    setIsEditing(false);
   };
-  
+
+  // Handle event deletion
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return;
+
+    try {
+      await removeEvent(selectedEvent.id); // Usar a função removeEvent do useData
+      toast({
+        title: "Event Deleted",
+        description: "Your event has been deleted.",
+      });
+
+      // Close dialog
+      setEventDetailOpen(false);
+      setSelectedEvent(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error deleting event",
+        description: (error as Error).message,
+      });
+    }
+  };
+
   // Render the calendar based on current view
   const renderCalendar = () => {
     switch (view) {
@@ -545,16 +447,16 @@ function CalendarPage() {
         return null;
     }
   };
-  
+
   // Render month view
   const renderMonthView = () => {
     const monthStart = startOfMonth(date);
     const monthEnd = endOfMonth(date);
     const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
     const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
-    
+
     const days = eachDayOfInterval({ start: startDate, end: endDate });
-    
+
     return (
       <div className="grid grid-cols-7 gap-px bg-muted rounded-md overflow-hidden">
         {/* Day headers */}
@@ -563,7 +465,7 @@ function CalendarPage() {
             {day.substring(0, 3)}
           </div>
         ))}
-        
+
         {/* Calendar cells */}
         {days.map((day, i) => {
           // Get events for this day
@@ -571,10 +473,10 @@ function CalendarPage() {
             const eventStart = parseISO(event.startDate);
             return isSameDay(eventStart, day);
           });
-          
+
           const isToday = isSameDay(day, new Date());
           const isCurrentMonth = isSameMonth(day, date);
-          
+
           return (
             <div
               key={i}
@@ -597,7 +499,7 @@ function CalendarPage() {
               )}>
                 {format(day, "d")}
               </div>
-              
+
               <div className="mt-7 space-y-1">
                 {dayEvents.slice(0, 3).map((event, index) => (
                   <div
@@ -614,7 +516,7 @@ function CalendarPage() {
                     {format(parseISO(event.startDate), "HH:mm")} - {event.title}
                   </div>
                 ))}
-                
+
                 {dayEvents.length > 3 && (
                   <div className="text-xs text-muted-foreground">
                     + {dayEvents.length - 3} more
@@ -627,16 +529,16 @@ function CalendarPage() {
       </div>
     );
   };
-  
+
   // Render week view
   const renderWeekView = () => {
     const weekStart = startOfWeek(date, { weekStartsOn: 0 });
     const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
-    
+
     // Create time slots from 7AM to 8PM
     const timeSlots = Array.from({ length: 14 }, (_, i) => i + 7);
-    
+
     return (
       <div className="overflow-auto">
         <div className="grid grid-cols-8 gap-px bg-muted min-w-[800px]">
@@ -644,7 +546,7 @@ function CalendarPage() {
           <div className="bg-card p-2 text-center font-medium">
             Time
           </div>
-          
+
           {/* Day headers */}
           {days.map((day, i) => (
             <div key={i} className="bg-card p-2 text-center font-medium">
@@ -656,7 +558,7 @@ function CalendarPage() {
               </div>
             </div>
           ))}
-          
+
           {/* Time slots */}
           {timeSlots.map((hour) => (
             <React.Fragment key={hour}>
@@ -664,24 +566,24 @@ function CalendarPage() {
               <div className="bg-card p-2 text-right text-sm text-muted-foreground">
                 {hour}:00
               </div>
-              
+
               {/* Day cells */}
               {days.map((day, dayIndex) => {
                 const dayStart = setHours(day, hour);
                 const dayEnd = setHours(day, hour + 1);
-                
+
                 // Get events for this time slot
                 const slotEvents = filteredEvents.filter(event => {
                   const eventStart = parseISO(event.startDate);
                   const eventEnd = parseISO(event.endDate);
-                  
+
                   return (
-                    isSameDay(eventStart, day) && 
-                    getHours(eventStart) <= hour && 
+                    isSameDay(eventStart, day) &&
+                    getHours(eventStart) <= hour &&
                     getHours(eventEnd) > hour
                   );
                 });
-                
+
                 return (
                   <div
                     key={dayIndex}
@@ -691,8 +593,8 @@ function CalendarPage() {
                       setQuickAddEvent(prev => ({
                         ...prev,
                         date: day,
-                        startTime: `${hour}:00`,
-                        endTime: `${hour + 1}:00`,
+                        startTime: `${hour < 10 ? '0' : ''}${hour}:00`, // Formatar HH:mm
+                        endTime: `${(hour + 1) < 10 ? '0' : ''}${hour + 1}:00`, // Formatar HH:mm
                       }));
                       setQuickAddOpen(true);
                     }}
@@ -721,12 +623,12 @@ function CalendarPage() {
       </div>
     );
   };
-  
+
   // Render day view
   const renderDayView = () => {
     // Create time slots from 7AM to 8PM
     const timeSlots = Array.from({ length: 14 }, (_, i) => i + 7);
-    
+
     return (
       <div className="overflow-auto">
         <div className="grid grid-cols-2 gap-px bg-muted">
@@ -734,26 +636,26 @@ function CalendarPage() {
           {timeSlots.map((hour) => {
             const hourStart = setHours(date, hour);
             const hourEnd = setHours(date, hour + 1);
-            
+
             // Get events for this time slot
             const slotEvents = filteredEvents.filter(event => {
               const eventStart = parseISO(event.startDate);
               const eventEnd = parseISO(event.endDate);
-              
+
               return (
-                isSameDay(eventStart, date) && 
-                getHours(eventStart) <= hour && 
+                isSameDay(eventStart, date) &&
+                getHours(eventStart) <= hour &&
                 getHours(eventEnd) > hour
               );
             });
-            
+
             return (
               <React.Fragment key={hour}>
                 {/* Time label */}
                 <div className="bg-card p-3 text-right text-sm text-muted-foreground">
                   {hour}:00
                 </div>
-                
+
                 {/* Events */}
                 <div
                   className="bg-card p-2 min-h-[80px] border-t border-muted"
@@ -761,8 +663,8 @@ function CalendarPage() {
                     setQuickAddEvent(prev => ({
                       ...prev,
                       date,
-                      startTime: `${hour}:00`,
-                      endTime: `${hour + 1}:00`,
+                      startTime: `${hour < 10 ? '0' : ''}${hour}:00`,
+                      endTime: `${(hour + 1) < 10 ? '0' : ''}${hour + 1}:00`,
                     }));
                     setQuickAddOpen(true);
                   }}
@@ -799,7 +701,7 @@ function CalendarPage() {
       </div>
     );
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -815,7 +717,7 @@ function CalendarPage() {
           </Link>
         </Button>
       </div>
-      
+
       <Card>
         <CardHeader className="space-y-4">
           <div className="flex justify-between items-center">
@@ -831,7 +733,7 @@ function CalendarPage() {
               </Button>
               <h3 className="text-lg font-medium ml-2">{getDateRangeText()}</h3>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <Tabs value={view} onValueChange={(v) => setView(v as ViewType)} className="w-fit">
                 <TabsList>
@@ -840,7 +742,7 @@ function CalendarPage() {
                   <TabsTrigger value="day">Day</TabsTrigger>
                 </TabsList>
               </Tabs>
-              
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -856,7 +758,7 @@ function CalendarPage() {
                     onCheckedChange={(checked) => {
                       setFilters(prev => ({
                         ...prev,
-                        types: checked 
+                        types: checked
                           ? [...prev.types, "cleaning"]
                           : prev.types.filter(t => t !== "cleaning")
                       }));
@@ -870,7 +772,7 @@ function CalendarPage() {
                     onCheckedChange={(checked) => {
                       setFilters(prev => ({
                         ...prev,
-                        types: checked 
+                        types: checked
                           ? [...prev.types, "maintenance"]
                           : prev.types.filter(t => t !== "maintenance")
                       }));
@@ -879,7 +781,7 @@ function CalendarPage() {
                     <div className="w-3 h-3 bg-red-500 rounded-full mr-2" />
                     Maintenance
                   </DropdownMenuCheckboxItem>
-                  
+
                   {allProperties.length > 0 && (
                     <>
                       <DropdownMenuLabel className="mt-4">Properties</DropdownMenuLabel>
@@ -891,7 +793,7 @@ function CalendarPage() {
                           onCheckedChange={(checked) => {
                             setFilters(prev => ({
                               ...prev,
-                              properties: checked 
+                              properties: checked
                                 ? [...prev.properties, property.id]
                                 : prev.properties.filter(id => id !== property.id)
                             }));
@@ -903,7 +805,7 @@ function CalendarPage() {
                       ))}
                     </>
                   )}
-                  
+
                   {allEmployees.length > 0 && (
                     <>
                       <DropdownMenuLabel className="mt-4">Employees</DropdownMenuLabel>
@@ -915,7 +817,7 @@ function CalendarPage() {
                           onCheckedChange={(checked) => {
                             setFilters(prev => ({
                               ...prev,
-                              employees: checked 
+                              employees: checked
                                 ? [...prev.employees, employee.id]
                                 : prev.employees.filter(id => id !== employee.id)
                             }));
@@ -927,7 +829,7 @@ function CalendarPage() {
                       ))}
                     </>
                   )}
-                  
+
                   <div className="p-2">
                     <Button
                       variant="outline"
@@ -944,7 +846,7 @@ function CalendarPage() {
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
-              
+
               <Button variant="outline" size="sm" onClick={() => setQuickAddOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Quick Add
@@ -952,12 +854,12 @@ function CalendarPage() {
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           {renderCalendar()}
         </CardContent>
       </Card>
-      
+
       {/* Quick Add Event Dialog */}
       <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -967,7 +869,7 @@ function CalendarPage() {
               Create a new event in your calendar.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Input
@@ -1036,13 +938,13 @@ function CalendarPage() {
               </Select>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={handleQuickAddSubmit}>Add Event</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Event detail dialog */}
       <Dialog open={eventDetailOpen} onOpenChange={setEventDetailOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -1052,17 +954,17 @@ function CalendarPage() {
               View and edit the details of your event.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Input
                 placeholder="Event Title"
                 value={editedEvent?.title || ""}
-                onChange={(e) => setEditedEvent(prev => ({ ...prev, title: e.target.value }))}
+                onChange={(e) => setEditedEvent(prev => (prev ? { ...prev, title: e.target.value } : null))}
               />
               <Select
                 value={editedEvent?.propertyId || ""}
-                onValueChange={(value) => setEditedEvent(prev => ({ ...prev, propertyId: value }))}
+                onValueChange={(value) => setEditedEvent(prev => (prev ? { ...prev, propertyId: value } : null))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select Property" />
@@ -1077,7 +979,7 @@ function CalendarPage() {
               </Select>
               <Select
                 value={editedEvent?.assignedTo || ""}
-                onValueChange={(value) => setEditedEvent(prev => ({ ...prev, assignedTo: value }))}
+                onValueChange={(value) => setEditedEvent(prev => (prev ? { ...prev, assignedTo: value } : null))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select Assignee" />
@@ -1093,23 +995,23 @@ function CalendarPage() {
               <Input
                 placeholder="Notes"
                 value={editedEvent?.notes || ""}
-                onChange={(e) => setEditedEvent(prev => ({ ...prev, notes: e.target.value }))}
+                onChange={(e) => setEditedEvent(prev => (prev ? { ...prev, notes: e.target.value } : null))}
               />
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   type="time"
                   value={editedEvent?.startTime || "09:00"}
-                  onChange={(e) => setEditedEvent(prev => ({ ...prev, startTime: e.target.value }))}
+                  onChange={(e) => setEditedEvent(prev => (prev ? { ...prev, startTime: e.target.value } : null))}
                 />
                 <Input
                   type="time"
                   value={editedEvent?.endTime || "10:00"}
-                  onChange={(e) => setEditedEvent(prev => ({ ...prev, endTime: e.target.value }))}
+                  onChange={(e) => setEditedEvent(prev => (prev ? { ...prev, endTime: e.target.value } : null))}
                 />
               </div>
               <Select
                 value={editedEvent?.type || "cleaning"}
-                onValueChange={(value) => setEditedEvent(prev => ({ ...prev, type: value }))}
+                onValueChange={(value: "cleaning" | "maintenance") => setEditedEvent(prev => (prev ? { ...prev, type: value } : null))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select Type" />
@@ -1121,11 +1023,11 @@ function CalendarPage() {
               </Select>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={handleEditSubmit}>Save Changes</Button>
             <Button variant="destructive" onClick={handleDeleteEvent}>Delete Event</Button>
-            <Button onClick={cancelEdit}>Cancel</Button>
+            {/* Removido o botão Cancelar do modo de edição, pois o onOpenChange do Dialog cuida disso */}
           </DialogFooter>
         </DialogContent>
       </Dialog>

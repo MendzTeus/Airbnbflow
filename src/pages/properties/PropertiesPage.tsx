@@ -1,4 +1,4 @@
-
+// src/pages/properties/PropertiesPage.tsx
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Building, Plus, Search, MapPin, Bed, Bath, Info, Edit, Trash2 } from "lucide-react";
@@ -8,97 +8,46 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/hooks/use-data"; // Importar useData
 import { Property } from "@/types";
-
-// Mock property data
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: "1",
-    name: "Oceanview Apartment",
-    address: "123 Coastal Highway",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33101",
-    bedrooms: 2,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8bHV4dXJ5JTIwYXBhcnRtZW50fGVufDB8fDB8fA%3D%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Beautiful oceanfront apartment with stunning views",
-    createdAt: "2023-01-15T00:00:00.000Z",
-    updatedAt: "2023-01-15T00:00:00.000Z"
-  },
-  {
-    id: "2",
-    name: "Downtown Loft",
-    address: "456 Main Street",
-    city: "Chicago",
-    state: "IL",
-    zipCode: "60601",
-    bedrooms: 1,
-    bathrooms: 1,
-    imageUrl: "https://images.unsplash.com/photo-1560448075-32cafe5eb046?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NHx8bG9mdHxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Modern loft in the heart of downtown",
-    createdAt: "2023-02-10T00:00:00.000Z",
-    updatedAt: "2023-02-10T00:00:00.000Z"
-  },
-  {
-    id: "3",
-    name: "Mountain Retreat",
-    address: "789 Alpine Road",
-    city: "Aspen",
-    state: "CO",
-    zipCode: "81611",
-    bedrooms: 3,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8bW91bnRhaW4lMjBob21lfGVufDB8fDB8fA%3D%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Cozy cabin with breathtaking mountain views",
-    createdAt: "2023-03-05T00:00:00.000Z",
-    updatedAt: "2023-03-05T00:00:00.000Z"
-  },
-  {
-    id: "4",
-    name: "Beachfront Villa",
-    address: "101 Ocean Drive",
-    city: "San Diego",
-    state: "CA",
-    zipCode: "92109",
-    bedrooms: 4,
-    bathrooms: 3,
-    imageUrl: "https://images.unsplash.com/photo-1577495508048-b635879837f1?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8YmVhY2glMjB2aWxsYXxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60",
-    description: "Luxurious villa with direct beach access",
-    createdAt: "2023-04-20T00:00:00.000Z",
-    updatedAt: "2023-04-20T00:00:00.000Z"
-  }
-];
+import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
 
 export default function PropertiesPage() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
-  
-  const [properties, setProperties] = useState<Property[]>([]);
+  const { properties, removeProperty } = useData();
+
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
-  
+
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setProperties(MOCK_PROPERTIES);
+    // Definir loading como false quando as propriedades forem carregadas
+    if (Object.keys(properties).length > 0) {
       setLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
-  const filteredProperties = properties.filter(property =>
+    } else {
+      // Se não houver propriedades, ainda pode estar carregando ou estar vazio.
+      // Pode-se adicionar um timeout para evitar loading infinito se a requisição falhar.
+      const timer = setTimeout(() => {
+        if (Object.keys(properties).length === 0) {
+          setLoading(false); // Assume que não há propriedades a serem carregadas
+        }
+      }, 1500); // Dar um tempo para o fetch inicial
+      return () => clearTimeout(timer);
+    }
+  }, [properties]);
+
+  const propertiesArray = Object.values(properties); // Converte o objeto de propriedades em um array
+
+  const filteredProperties = propertiesArray.filter(property =>
     property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     property.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
     property.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
     property.state.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDelete = (id: string) => {
-    // In a real app, this would call an API to delete the property
-    setProperties(properties.filter(p => p.id !== id));
+  const handleDelete = async (id: string) => {
+    await removeProperty(id);
   };
 
   return (
@@ -139,9 +88,9 @@ export default function PropertiesPage() {
       
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="overflow-hidden h-[280px] animate-pulse">
-              <div className="h-full bg-muted/50"></div>
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="overflow-hidden h-[280px]">
+              <Skeleton className="h-full w-full" />
             </Card>
           ))}
         </div>

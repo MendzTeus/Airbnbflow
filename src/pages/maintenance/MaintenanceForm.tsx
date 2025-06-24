@@ -1,90 +1,43 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+// src/pages/maintenance/MaintenanceForm.tsx
+import { useState, useEffect, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/use-translation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "@/hooks/use-toast";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Form, 
-  FormControl, 
-  FormDescription, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Property, Employee } from "@/types";
 import { ArrowLeft } from "lucide-react";
+import { useData } from "@/hooks/use-data";
 
-// Mock data for properties
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: "1",
-    name: "Beach House",
-    address: "123 Ocean Drive",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33139",
-    bedrooms: 3,
-    bathrooms: 2,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Mountain Cabin",
-    address: "45 Alpine Road",
-    city: "Aspen",
-    state: "CO",
-    zipCode: "81611",
-    bedrooms: 2,
-    bathrooms: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-// Mock data for employees
-const MOCK_EMPLOYEES: Employee[] = [
-  {
-    id: "1",
-    name: "John Manager",
-    email: "manager@airbnbflow.com",
-    phone: "555-123-4567",
-    role: "manager",
-    startDate: new Date().toISOString(),
-    properties: ["1", "2"],
-  },
-  {
-    id: "2",
-    name: "Sarah Cleaner",
-    email: "cleaner@airbnbflow.com",
-    phone: "555-987-6543",
-    role: "cleaner",
-    startDate: new Date().toISOString(),
-    properties: ["1"],
-  },
-];
 
 // Maintenance request form schema
 const maintenanceSchema = z.object({
@@ -116,39 +69,13 @@ export default function MaintenanceForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { properties, employees, getMaintenanceRequestById, addMaintenanceRequest, updateMaintenanceRequest } = useData();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = !!id;
+  const location = useLocation();
 
-  // Simulated fetch of maintenance request for edit mode
-  const [maintenanceRequest, setMaintenanceRequest] = useState<{
-    id: string;
-    propertyId: string;
-    title: string;
-    description: string;
-    priority: "low" | "medium" | "high";
-    status: "open" | "in-progress" | "completed";
-    assignedTo?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (isEditMode) {
-      // In a real app, this would be an API call to fetch the maintenance request
-      // For now, simulate a delay
-      const timer = setTimeout(() => {
-        setMaintenanceRequest({
-          id: "1",
-          propertyId: "1",
-          title: "Leaking Faucet",
-          description: "The bathroom faucet is leaking constantly.",
-          priority: "medium",
-          status: "open",
-          assignedTo: undefined,
-        });
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isEditMode, id]);
+  const allProperties = Object.values(properties);
+  const allEmployees = Object.values(employees);
 
   const form = useForm<z.infer<typeof maintenanceSchema>>({
     resolver: zodResolver(maintenanceSchema),
@@ -164,44 +91,84 @@ export default function MaintenanceForm() {
 
   // Update form when maintenance request is loaded
   useEffect(() => {
-    if (maintenanceRequest) {
-      form.reset({
-        propertyId: maintenanceRequest.propertyId,
-        title: maintenanceRequest.title,
-        description: maintenanceRequest.description,
-        priority: maintenanceRequest.priority,
-        status: maintenanceRequest.status,
-        assignedTo: maintenanceRequest.assignedTo,
-      });
+    if (isEditMode && id) {
+      const maintenanceRequest = getMaintenanceRequestById(id);
+      if (maintenanceRequest) {
+        form.reset({
+          propertyId: maintenanceRequest.propertyId,
+          title: maintenanceRequest.title,
+          description: maintenanceRequest.description,
+          priority: maintenanceRequest.priority,
+          status: maintenanceRequest.status,
+          assignedTo: maintenanceRequest.assignedTo || "",
+        });
+      } else {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Maintenance request not found.",
+        });
+        navigate("/maintenance"); // Redirecionar se não encontrar
+      }
+    } else {
+        // Pre-fill propertyId if passed in URL
+        const queryParams = new URLSearchParams(location.search);
+        const propertyIdFromUrl = queryParams.get("propertyId");
+        if (propertyIdFromUrl) {
+            form.setValue("propertyId", propertyIdFromUrl);
+        }
     }
-  }, [maintenanceRequest, form]);
+  }, [isEditMode, id, getMaintenanceRequestById, form, navigate, toast, location.search]);
+
 
   const onSubmit = async (values: z.infer<typeof maintenanceSchema>) => {
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // In a real app, this would be an actual API call to create/update the maintenance request
-    toast({
-      title: isEditMode 
-        ? "Maintenance request updated" 
-        : "Maintenance request created",
-      description: isEditMode 
-        ? "The maintenance request has been updated successfully." 
-        : "A new maintenance request has been created.",
-    });
-    
-    setIsSubmitting(false);
-    navigate("/maintenance");
+
+    try {
+      const maintenanceData = {
+        propertyId: values.propertyId,
+        title: values.title,
+        description: values.description,
+        priority: values.priority,
+        status: values.status,
+        assignedTo: values.assignedTo === "" ? undefined : values.assignedTo,
+        // id, createdAt, updatedAt, completedAt serão gerenciados pelo DataContext
+      };
+
+      if (isEditMode && id) {
+        await updateMaintenanceRequest({ ...maintenanceData as MaintenanceRequest, id: id });
+      } else {
+        await addMaintenanceRequest(maintenanceData);
+      }
+
+      toast({
+        title: isEditMode
+          ? "Maintenance request updated"
+          : "Maintenance request created",
+        description: isEditMode
+          ? "The maintenance request has been updated successfully."
+          : "A new maintenance request has been created.",
+      });
+
+      navigate("/maintenance");
+    } catch (err) {
+      console.error("Error saving maintenance request:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to save maintenance request. ${(err instanceof Error ? err.message : '')}`,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => navigate("/maintenance")}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -217,7 +184,7 @@ export default function MaintenanceForm() {
             {isEditMode ? t("common.edit") : t("maintenance.newRequest")}
           </CardTitle>
           <CardDescription>
-            {isEditMode 
+            {isEditMode
               ? t("common.edit") + " " + t("maintenance.title").toLowerCase()
               : t("common.create") + " " + t("maintenance.title").toLowerCase()
             }
@@ -232,9 +199,8 @@ export default function MaintenanceForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("accessCodes.property")}</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
+                    <Select
+                      onValueChange={field.onChange}
                       value={field.value}
                     >
                       <FormControl>
@@ -243,7 +209,7 @@ export default function MaintenanceForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {MOCK_PROPERTIES.map((property) => (
+                        {allProperties.map((property) => (
                           <SelectItem key={property.id} value={property.id}>
                             {property.name}
                           </SelectItem>
@@ -281,10 +247,10 @@ export default function MaintenanceForm() {
                   <FormItem>
                     <FormLabel>{t("common.description")}</FormLabel>
                     <FormControl>
-                      <Textarea 
+                      <Textarea
                         placeholder="Provide details about the maintenance issue..."
                         className="min-h-[120px]"
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -299,9 +265,8 @@ export default function MaintenanceForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("common.priority")}</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
+                      <Select
+                        onValueChange={field.onChange}
                         value={field.value}
                       >
                         <FormControl>
@@ -326,9 +291,8 @@ export default function MaintenanceForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("common.status")}</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
+                      <Select
+                        onValueChange={field.onChange}
                         value={field.value}
                       >
                         <FormControl>
@@ -354,9 +318,8 @@ export default function MaintenanceForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("maintenance.assignedTo")}</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value || ""}
+                    <Select
+                      onValueChange={field.onChange}
                       value={field.value || ""}
                     >
                       <FormControl>
@@ -365,8 +328,8 @@ export default function MaintenanceForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {MOCK_EMPLOYEES.map((employee) => (
+                        <SelectItem value="">Unassigned</SelectItem>
+                        {allEmployees.map((employee) => (
                           <SelectItem key={employee.id} value={employee.id}>
                             {employee.name} ({employee.role})
                           </SelectItem>
@@ -382,17 +345,17 @@ export default function MaintenanceForm() {
               />
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => navigate("/maintenance")}
               >
                 {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting 
-                  ? t("common.loading") 
-                  : isEditMode 
-                    ? t("common.save") 
+                {isSubmitting
+                  ? t("common.loading")
+                  : isEditMode
+                    ? t("common.save")
                     : t("common.create")
                 }
               </Button>

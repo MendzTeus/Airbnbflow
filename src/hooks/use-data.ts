@@ -1,18 +1,12 @@
-
+// src/hooks/use-data.ts
 import { useDataContext } from '@/contexts/DataContext';
-import { useState, useMemo } from 'react';
 import { Property, Employee, Checklist, AccessCode, MaintenanceRequest, CalendarEvent } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 
-/**
- * Enhanced hook to access the data context with utility functions
- * for more convenient data access across the application
- */
 export const useData = () => {
   const context = useDataContext();
   const { toast } = useToast();
 
-  // Helper function to display toast notifications for data operations
   const notifyChange = (message: string, type: "success" | "error" = "success") => {
     toast({
       title: type === "success" ? "Success" : "Error",
@@ -21,325 +15,246 @@ export const useData = () => {
     });
   };
 
-  // Properties helper methods
-  const updateProperty = (property: Property) => {
+  // Propriedades
+  const updateProperty = async (property: Property) => {
     try {
-      context.setProperties(prev => ({
-        ...prev,
-        [property.id]: property
-      }));
+      await context.updateProperty(property);
       notifyChange(`Property "${property.name}" updated successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to update property: ${error}`, "error");
+      notifyChange(`Failed to update property: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const addProperty = (property: Property) => {
+  const addProperty = async (property: Partial<Property>) => {
     try {
-      context.setProperties(prev => ({
-        ...prev,
-        [property.id]: property
-      }));
-      notifyChange(`Property "${property.name}" added successfully`);
+      const addedProperty = await context.addProperty(property);
+      notifyChange(`Property "${addedProperty.name}" added successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to add property: ${error}`, "error");
+      notifyChange(`Failed to add property: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const removeProperty = (id: string) => {
+  const removeProperty = async (id: string) => {
     try {
       const property = context.getPropertyById(id);
       if (!property) throw new Error("Property not found");
-      
-      context.setProperties(prev => {
-        const newProps = { ...prev };
-        delete newProps[id];
-        return newProps;
-      });
-      
+
+      await context.removeProperty(id);
       notifyChange(`Property "${property.name}" removed successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to remove property: ${error}`, "error");
+      notifyChange(`Failed to remove property: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  // Employees helper methods
-  const updateEmployee = (employee: Employee) => {
+  // Funcionários
+  const updateEmployee = async (employee: Employee) => {
     try {
-      context.setEmployees(prev => ({
-        ...prev,
-        [employee.id]: employee
-      }));
+      await context.updateEmployee(employee);
       notifyChange(`Employee "${employee.name}" updated successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to update employee: ${error}`, "error");
+      notifyChange(`Failed to update employee: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const addEmployee = (employee: Employee) => {
+  const addEmployee = async (employee: Partial<Employee>) => {
     try {
-      context.setEmployees(prev => ({
-        ...prev,
-        [employee.id]: employee
-      }));
-      notifyChange(`Employee "${employee.name}" added successfully`);
+      const addedEmployee = await context.addEmployee(employee);
+      notifyChange(`Employee "${addedEmployee.name}" added successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to add employee: ${error}`, "error");
+      notifyChange(`Failed to add employee: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const removeEmployee = (id: string) => {
+  const removeEmployee = async (id: string) => {
     try {
       const employee = context.getEmployeeById(id);
       if (!employee) throw new Error("Employee not found");
-      
-      context.setEmployees(prev => {
-        const newEmployees = { ...prev };
-        delete newEmployees[id];
-        return newEmployees;
-      });
-      
+
+      await context.removeEmployee(id);
       notifyChange(`Employee "${employee.name}" removed successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to remove employee: ${error}`, "error");
+      notifyChange(`Failed to remove employee: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  // Checklists helper methods
-  const updateChecklist = (checklist: Checklist) => {
+  // Checklists
+  const updateChecklist = async (checklist: Checklist) => {
     try {
-      context.setChecklists(prev => ({
-        ...prev,
-        [checklist.id]: checklist
-      }));
+      await context.updateChecklist(checklist);
       notifyChange(`Checklist "${checklist.title}" updated successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to update checklist: ${error}`, "error");
+      notifyChange(`Failed to update checklist: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const addChecklist = (checklist: Checklist) => {
+  const addChecklist = async (checklist: Partial<Checklist>) => {
     try {
-      context.setChecklists(prev => ({
-        ...prev,
-        [checklist.id]: checklist
-      }));
-      notifyChange(`Checklist "${checklist.title}" added successfully`);
+      const addedChecklist = await context.addChecklist(checklist);
+      notifyChange(`Checklist "${addedChecklist.title}" added successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to add checklist: ${error}`, "error");
+      notifyChange(`Failed to add checklist: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const removeChecklist = (id: string) => {
+  const removeChecklist = async (id: string) => {
     try {
       const checklist = context.getChecklistById(id);
       if (!checklist) throw new Error("Checklist not found");
-      
-      context.setChecklists(prev => {
-        const newChecklists = { ...prev };
-        delete newChecklists[id];
-        return newChecklists;
-      });
-      
+
+      await context.removeChecklist(id);
       notifyChange(`Checklist "${checklist.title}" removed successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to remove checklist: ${error}`, "error");
+      notifyChange(`Failed to remove checklist: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  // Calendar events helper methods
-  const updateEvent = (event: CalendarEvent) => {
+  // Calendar Events
+  const updateEvent = async (event: CalendarEvent) => {
     try {
-      context.setEvents(prev => ({
-        ...prev,
-        [event.id]: { ...event, updatedAt: new Date().toISOString() }
-      }));
+      await context.updateEvent(event);
       notifyChange(`Event "${event.title}" updated successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to update event: ${error}`, "error");
+      notifyChange(`Failed to update event: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const addEvent = (event: CalendarEvent) => {
+  const addEvent = async (event: Partial<CalendarEvent>) => {
     try {
-      const newEvent = { 
-        ...event, 
-        id: event.id || Math.random().toString(36).substring(2, 9),
-        createdAt: event.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      context.setEvents(prev => ({
-        ...prev,
-        [newEvent.id]: newEvent
-      }));
-      
-      notifyChange(`Event "${event.title}" added successfully`);
+      const addedEvent = await context.addEvent(event);
+      notifyChange(`Event "${addedEvent.title}" added successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to add event: ${error}`, "error");
+      notifyChange(`Failed to add event: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const removeEvent = (id: string) => {
+  const removeEvent = async (id: string) => {
     try {
       const event = context.getEventById(id);
       if (!event) throw new Error("Event not found");
-      
-      context.setEvents(prev => {
-        const newEvents = { ...prev };
-        delete newEvents[id];
-        return newEvents;
-      });
-      
+
+      await context.removeEvent(id);
       notifyChange(`Event "${event.title}" removed successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to remove event: ${error}`, "error");
+      notifyChange(`Failed to remove event: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  // Access Codes helper methods
-  const updateAccessCode = (code: AccessCode) => {
+  // Access Codes
+  const updateAccessCode = async (code: AccessCode) => {
     try {
-      context.setAccessCodes(prev => ({
-        ...prev,
-        [code.id]: code
-      }));
+      await context.updateAccessCode(code);
       notifyChange(`Access code "${code.name}" updated successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to update access code: ${error}`, "error");
+      notifyChange(`Failed to update access code: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const addAccessCode = (code: AccessCode) => {
+  const addAccessCode = async (code: Partial<AccessCode>) => {
     try {
-      context.setAccessCodes(prev => ({
-        ...prev,
-        [code.id]: code
-      }));
-      notifyChange(`Access code "${code.name}" added successfully`);
+      const addedCode = await context.addAccessCode(code);
+      notifyChange(`Access code "${addedCode.name}" added successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to add access code: ${error}`, "error");
+      notifyChange(`Failed to add access code: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const removeAccessCode = (id: string) => {
+  const removeAccessCode = async (id: string) => {
     try {
       const code = context.getAccessCodeById(id);
       if (!code) throw new Error("Access code not found");
-      
-      context.setAccessCodes(prev => {
-        const newCodes = { ...prev };
-        delete newCodes[id];
-        return newCodes;
-      });
-      
+
+      await context.removeAccessCode(id);
       notifyChange(`Access code "${code.name}" removed successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to remove access code: ${error}`, "error");
+      notifyChange(`Failed to remove access code: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  // Maintenance Requests helper methods
-  const updateMaintenanceRequest = (request: MaintenanceRequest) => {
+  // Maintenance Requests
+  const updateMaintenanceRequest = async (request: MaintenanceRequest) => {
     try {
-      context.setMaintenanceRequests(prev => ({
-        ...prev,
-        [request.id]: request
-      }));
+      await context.updateMaintenanceRequest(request);
       notifyChange(`Maintenance request "${request.title}" updated successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to update maintenance request: ${error}`, "error");
+      notifyChange(`Failed to update maintenance request: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const addMaintenanceRequest = (request: MaintenanceRequest) => {
+  const addMaintenanceRequest = async (request: Partial<MaintenanceRequest>) => {
     try {
-      context.setMaintenanceRequests(prev => ({
-        ...prev,
-        [request.id]: request
-      }));
-      notifyChange(`Maintenance request "${request.title}" added successfully`);
+      const addedRequest = await context.addMaintenanceRequest(request);
+      notifyChange(`Maintenance request "${addedRequest.title}" added successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to add maintenance request: ${error}`, "error");
+      notifyChange(`Failed to add maintenance request: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
-  const removeMaintenanceRequest = (id: string) => {
+  const removeMaintenanceRequest = async (id: string) => {
     try {
       const request = context.getMaintenanceRequestById(id);
       if (!request) throw new Error("Maintenance request not found");
-      
-      context.setMaintenanceRequests(prev => {
-        const newRequests = { ...prev };
-        delete newRequests[id];
-        return newRequests;
-      });
-      
+
+      await context.removeMaintenanceRequest(id);
       notifyChange(`Maintenance request "${request.title}" removed successfully`);
       return true;
     } catch (error) {
-      notifyChange(`Failed to remove maintenance request: ${error}`, "error");
+      notifyChange(`Failed to remove maintenance request: ${(error as Error).message}`, "error");
       return false;
     }
   };
 
+
   return {
-    ...context,
-    // Enhanced property methods
+    ...context, // Continua expondo as propriedades de dados (properties, employees, etc.)
     updateProperty,
     addProperty,
     removeProperty,
-    // Enhanced employee methods
     updateEmployee,
     addEmployee,
     removeEmployee,
-    // Enhanced checklist methods
     updateChecklist,
     addChecklist,
     removeChecklist,
-    // Enhanced calendar event methods
     updateEvent,
     addEvent,
     removeEvent,
-    // Enhanced access code methods
     updateAccessCode,
     addAccessCode,
     removeAccessCode,
-    // Enhanced maintenance request methods
     updateMaintenanceRequest,
     addMaintenanceRequest,
     removeMaintenanceRequest,

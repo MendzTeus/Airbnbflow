@@ -1,4 +1,4 @@
-
+// src/pages/auth/Register.tsx
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,8 +31,8 @@ export default function Register() {
     
     try {
       await register(name, email, password, role);
-    } catch (err) {
-      setError("Registration failed. Please try again.");
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please try again.");
     }
   };
 

@@ -1,4 +1,4 @@
-
+// src/hooks/use-checklists.ts
 import { useMemo } from 'react';
 import { useData } from './use-data';
 import { Checklist } from '@/types';
@@ -6,7 +6,6 @@ import { Checklist } from '@/types';
 export const useChecklists = () => {
   const { checklists, properties } = useData();
   
-  // Convert to arrays for easier processing
   const checklistsArray = useMemo(() => 
     checklists ? Object.values(checklists) : [], 
     [checklists]

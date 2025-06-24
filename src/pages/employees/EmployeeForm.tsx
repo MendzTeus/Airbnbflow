@@ -1,4 +1,4 @@
-
+// src/pages/employees/EmployeeForm.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -23,102 +23,17 @@ import {
 import { Employee, Property, UserRole } from "@/types";
 import { AlertCircle, ArrowLeft, Building, Users } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useData } from "@/hooks/use-data"; // Importar useData
+import { useToast } from "@/hooks/use-toast"; // Importar useToast
 
-// Mock employees data
-const MOCK_EMPLOYEES: Employee[] = [
-  {
-    id: "1",
-    name: "John Manager",
-    email: "manager@airbnbflow.com",
-    phone: "555-123-4567",
-    role: "manager",
-    startDate: "2023-01-10T00:00:00.000Z",
-    properties: ["1", "2"]
-  },
-  {
-    id: "2",
-    name: "Sarah Cleaner",
-    email: "cleaner@airbnbflow.com",
-    phone: "555-987-6543",
-    role: "cleaner",
-    startDate: "2023-02-15T00:00:00.000Z",
-    properties: ["1", "3", "4"]
-  },
-  {
-    id: "3",
-    name: "Mike Johnson",
-    email: "mike@airbnbflow.com",
-    phone: "555-555-1234",
-    role: "cleaner",
-    startDate: "2023-03-20T00:00:00.000Z",
-    properties: ["2"]
-  }
-];
-
-// Mock properties data
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: "1",
-    name: "Oceanview Apartment",
-    address: "123 Coastal Highway",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33101",
-    bedrooms: 2,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2",
-    description: "Beautiful oceanfront apartment with stunning views",
-    createdAt: "2023-01-15T00:00:00.000Z",
-    updatedAt: "2023-01-15T00:00:00.000Z"
-  },
-  {
-    id: "2",
-    name: "Downtown Loft",
-    address: "456 Main Street",
-    city: "Chicago",
-    state: "IL",
-    zipCode: "60601",
-    bedrooms: 1,
-    bathrooms: 1,
-    imageUrl: "https://images.unsplash.com/photo-1560448075-32cafe5eb046",
-    description: "Modern loft in the heart of downtown",
-    createdAt: "2023-02-10T00:00:00.000Z",
-    updatedAt: "2023-02-10T00:00:00.000Z"
-  },
-  {
-    id: "3",
-    name: "Mountain Retreat",
-    address: "789 Alpine Road",
-    city: "Aspen",
-    state: "CO",
-    zipCode: "81611",
-    bedrooms: 3,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1518780664697-55e3ad937233",
-    description: "Cozy cabin with breathtaking mountain views",
-    createdAt: "2023-03-05T00:00:00.000Z",
-    updatedAt: "2023-03-05T00:00:00.000Z"
-  },
-  {
-    id: "4",
-    name: "Beachfront Villa",
-    address: "101 Ocean Drive",
-    city: "San Diego",
-    state: "CA",
-    zipCode: "92109",
-    bedrooms: 4,
-    bathrooms: 3,
-    imageUrl: "https://images.unsplash.com/photo-1577495508048-b635879837f1",
-    description: "Luxurious villa with direct beach access",
-    createdAt: "2023-04-20T00:00:00.000Z",
-    updatedAt: "2023-04-20T00:00:00.000Z"
-  }
-];
+// Removido MOCK_EMPLOYEES e MOCK_PROPERTIES
 
 export default function EmployeeForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
+  const { getEmployeeById, addEmployee, updateEmployee, properties: allProperties } = useData(); // Obter dados e funções do useData
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState<Partial<Employee>>({
     name: "",
@@ -129,33 +44,32 @@ export default function EmployeeForm() {
     properties: []
   });
   
-  const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(isEditing);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   
   useEffect(() => {
-    // Simulate API call to get properties
-    const timer = setTimeout(() => {
-      setProperties(MOCK_PROPERTIES);
-      
-      if (isEditing) {
-        const employee = MOCK_EMPLOYEES.find(e => e.id === id);
-        if (employee) {
-          setFormData({
-            ...employee,
-            startDate: new Date(employee.startDate).toISOString().split("T")[0]
-          });
-        } else {
-          setError("Employee not found");
-        }
+    if (isEditing) {
+      const employee = getEmployeeById(id);
+      if (employee) {
+        setFormData({
+          ...employee,
+          startDate: new Date(employee.startDate).toISOString().split("T")[0] // Formata a data para input type="date"
+        });
+      } else {
+        setError("Employee not found");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Employee not found.",
+        });
+        navigate("/employees"); // Redirecionar se não encontrar
       }
-      
       setLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [id, isEditing]);
+    } else {
+      setLoading(false);
+    }
+  }, [id, isEditing, getEmployeeById, navigate, toast]);
   
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -165,17 +79,17 @@ export default function EmployeeForm() {
   };
   
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value as UserRole })); // Certifique-se de que o cast é seguro
   };
   
   const handlePropertyToggle = (propertyId: string) => {
     setFormData(prev => {
-      const properties = prev.properties || [];
+      const currentProperties = prev.properties || [];
       
-      if (properties.includes(propertyId)) {
-        return { ...prev, properties: properties.filter(id => id !== propertyId) };
+      if (currentProperties.includes(propertyId)) {
+        return { ...prev, properties: currentProperties.filter(id => id !== propertyId) };
       } else {
-        return { ...prev, properties: [...properties, propertyId] };
+        return { ...prev, properties: [...currentProperties, propertyId] };
       }
     });
   };
@@ -186,30 +100,37 @@ export default function EmployeeForm() {
     setSubmitting(true);
     
     try {
-      // Validate form
-      if (!formData.name || !formData.email || !formData.phone || !formData.role) {
-        throw new Error("Please fill in all required fields");
+      if (!formData.name || !formData.email || !formData.phone || !formData.role || !formData.startDate) {
+        throw new Error("Please fill in all required fields.");
       }
       
-      // Check email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
-        throw new Error("Please enter a valid email address");
+        throw new Error("Please enter a valid email address.");
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (isEditing) {
+        await updateEmployee(formData as Employee); // Cast para Employee completo
+      } else {
+        await addEmployee(formData); // Partial<Employee> é aceitável para adicionar
+      }
       
-      // In a real app, this would send data to the server
-      console.log("Submitting employee:", formData);
-      
-      // Navigate back to employees list after success
       navigate("/employees");
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to save employee: ${err.message}`,
+        });
       } else {
         setError("An unexpected error occurred");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "An unexpected error occurred while saving the employee.",
+        });
       }
     } finally {
       setSubmitting(false);
@@ -305,7 +226,7 @@ export default function EmployeeForm() {
                 <div className="space-y-2">
                   <Label htmlFor="role">Role*</Label>
                   <Select 
-                    value={formData.role as string} 
+                    value={formData.role || ""} 
                     onValueChange={(value) => handleSelectChange("role", value)}
                   >
                     <SelectTrigger id="role">
@@ -344,10 +265,10 @@ export default function EmployeeForm() {
               
               <CardContent>
                 <div className="space-y-4">
-                  {properties.length === 0 ? (
+                  {Object.values(allProperties).length === 0 ? (
                     <p className="text-muted-foreground">No properties available</p>
                   ) : (
-                    properties.map(property => (
+                    Object.values(allProperties).map(property => (
                       <div key={property.id} className="flex items-start space-x-2">
                         <Checkbox
                           id={`property-${property.id}`}

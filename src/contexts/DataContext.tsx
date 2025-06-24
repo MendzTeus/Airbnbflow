@@ -1,8 +1,9 @@
-
+// src/contexts/DataContext.tsx
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Property, Employee, Checklist, AccessCode, MaintenanceRequest, CalendarEvent } from "@/types";
+import { supabase } from "@/lib/supabase";
+import { v4 as uuidv4 } from 'uuid'; // Para gerar IDs no front-end se o DB não tiver um default
 
-// Define the shape of our data context
 interface DataContextType {
   properties: Record<string, Property>;
   employees: Record<string, Employee>;
@@ -11,13 +12,10 @@ interface DataContextType {
   maintenanceRequests: Record<string, MaintenanceRequest>;
   events: Record<string, CalendarEvent>;
   
-  setProperties: (propertiesOrFunction: Record<string, Property> | ((prev: Record<string, Property>) => Record<string, Property>)) => void;
-  setEmployees: (employeesOrFunction: Record<string, Employee> | ((prev: Record<string, Employee>) => Record<string, Employee>)) => void;
-  setChecklists: (checklistsOrFunction: Record<string, Checklist> | ((prev: Record<string, Checklist>) => Record<string, Checklist>)) => void;
-  setAccessCodes: (accessCodesOrFunction: Record<string, AccessCode> | ((prev: Record<string, AccessCode>) => Record<string, AccessCode>)) => void;
-  setMaintenanceRequests: (maintenanceRequestsOrFunction: Record<string, MaintenanceRequest> | ((prev: Record<string, MaintenanceRequest>) => Record<string, MaintenanceRequest>)) => void;
-  setEvents: (eventsOrFunction: Record<string, CalendarEvent> | ((prev: Record<string, CalendarEvent>) => Record<string, CalendarEvent>)) => void;
-  
+  // Setters removidos da interface, pois a manipulação será via add/update/remove
+  // setProperties: (propertiesOrFunction: Record<string, Property> | ((prev: Record<string, Property>) => Record<string, Property>)) => void;
+  // ...
+
   getPropertyById: (id: string) => Property | undefined;
   getEmployeeById: (id: string) => Employee | undefined;
   getChecklistById: (id: string) => Checklist | undefined;
@@ -33,12 +31,35 @@ interface DataContextType {
   getMaintenanceRequestsByRegion: (region: string) => MaintenanceRequest[];
   getEventsByPropertyId: (propertyId: string) => CalendarEvent[];
   getEventsByAssignee: (assigneeId: string) => CalendarEvent[];
+
+  // Funções CRUD com Supabase
+  addProperty: (property: Partial<Property>) => Promise<Property>;
+  updateProperty: (property: Property) => Promise<Property>;
+  removeProperty: (id: string) => Promise<void>;
+
+  addEmployee: (employee: Partial<Employee>) => Promise<Employee>;
+  updateEmployee: (employee: Employee) => Promise<Employee>;
+  removeEmployee: (id: string) => Promise<void>;
+
+  addChecklist: (checklist: Partial<Checklist>) => Promise<Checklist>;
+  updateChecklist: (checklist: Checklist) => Promise<Checklist>;
+  removeChecklist: (id: string) => Promise<void>;
+
+  addAccessCode: (accessCode: Partial<AccessCode>) => Promise<AccessCode>;
+  updateAccessCode: (accessCode: AccessCode) => Promise<AccessCode>;
+  removeAccessCode: (id: string) => Promise<void>;
+
+  addMaintenanceRequest: (request: Partial<MaintenanceRequest>) => Promise<MaintenanceRequest>;
+  updateMaintenanceRequest: (request: MaintenanceRequest) => Promise<MaintenanceRequest>;
+  removeMaintenanceRequest: (id: string) => Promise<void>;
+
+  addEvent: (event: Partial<CalendarEvent>) => Promise<CalendarEvent>;
+  updateEvent: (event: CalendarEvent) => Promise<CalendarEvent>;
+  removeEvent: (id: string) => Promise<void>;
 }
 
-// Create the data context
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Provide access to the data context
 export const useDataContext = () => {
   const context = useContext(DataContext);
   if (!context) {
@@ -47,165 +68,37 @@ export const useDataContext = () => {
   return context;
 };
 
-// Mock data for development
-const mockProperties: Record<string, Property> = {
-  "prop1": {
-    id: "prop1",
-    name: "Luxury Downtown Loft",
-    address: "123 Main St",
-    city: "San Francisco",
-    state: "CA",
-    region: "Downtown",
-    zipCode: "94105",
-    bedrooms: 2,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1740&q=80",
-    description: "Modern loft in the heart of downtown with amazing city views.",
-    createdAt: "2023-01-15T00:00:00.000Z",
-    updatedAt: "2023-01-15T00:00:00.000Z"
-  },
-  "prop2": {
-    id: "prop2",
-    name: "Beachfront Villa",
-    address: "456 Ocean Dr",
-    city: "Malibu",
-    state: "CA",
-    region: "Beach",
-    zipCode: "90265",
-    bedrooms: 4,
-    bathrooms: 3,
-    imageUrl: "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2070&q=80",
-    description: "Stunning beachfront property with direct access to the sand.",
-    createdAt: "2023-02-20T00:00:00.000Z",
-    updatedAt: "2023-02-20T00:00:00.000Z"
-  },
-  // ... more property data
-};
-
-const mockEmployees: Record<string, Employee> = {
-  "emp1": {
-    id: "emp1",
-    name: "John Doe",
-    email: "john@example.com",
-    phone: "555-123-4567",
-    role: "cleaner",
-    startDate: "2023-01-10T00:00:00.000Z",
-    properties: ["prop1", "prop2"]
-  },
-  "emp2": {
-    id: "emp2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    phone: "555-987-6543",
-    role: "manager",
-    startDate: "2022-11-15T00:00:00.000Z",
-    properties: ["prop1"]
-  },
-  // ... more employee data
-};
-
-const mockChecklists: Record<string, Checklist> = {
-  "check1": {
-    id: "check1",
-    title: "Standard Cleaning",
-    propertyId: "prop1",
-    assignedTo: "emp1",
-    type: "checkout",
-    items: [
-      { id: "item1", text: "Clean bathrooms", completed: true },
-      { id: "item2", text: "Vacuum floors", completed: false },
-      { id: "item3", text: "Change linens", completed: true }
-    ],
-    createdAt: "2023-03-15T00:00:00.000Z",
-    updatedAt: "2023-03-15T00:00:00.000Z"
-  },
-  // ... more checklist data
-};
-
-const mockAccessCodes: Record<string, AccessCode> = {
-  "code1": {
-    id: "code1",
-    name: "Main Door",
-    code: "1234",
-    propertyId: "prop1",
-    expiryDate: "2023-12-31T00:00:00.000Z",
-    createdAt: "2023-01-01T00:00:00.000Z",
-    updatedAt: "2023-01-01T00:00:00.000Z"
-  },
-  "code2": {
-    id: "code2",
-    name: "Garden Gate",
-    code: "5678",
-    propertyId: "prop2",
-    createdAt: "2023-02-01T00:00:00.000Z",
-    updatedAt: "2023-02-01T00:00:00.000Z"
-  },
-  // ... more access code data
-};
-
-const mockMaintenanceRequests: Record<string, MaintenanceRequest> = {
-  "maint1": {
-    id: "maint1",
-    title: "Leaking Faucet",
-    description: "Kitchen sink faucet is leaking and needs repair.",
-    propertyId: "prop1",
-    assignedTo: "emp1",
-    status: "open",
-    priority: "medium",
-    createdAt: "2023-04-05T00:00:00.000Z",
-    updatedAt: "2023-04-05T00:00:00.000Z"
-  },
-  "maint2": {
-    id: "maint2",
-    title: "AC Not Working",
-    description: "Air conditioning unit is not cooling properly.",
-    propertyId: "prop2",
-    status: "in-progress",
-    priority: "high",
-    createdAt: "2023-04-10T00:00:00.000Z",
-    updatedAt: "2023-04-11T00:00:00.000Z"
-  },
-  // ... more maintenance request data
-};
-
-const mockEvents: Record<string, CalendarEvent> = {
-  "event1": {
-    id: "event1",
-    title: "Regular Cleaning",
-    propertyId: "prop1",
-    assignedTo: "emp1",
-    startDate: "2023-04-15T10:00:00.000Z",
-    endDate: "2023-04-15T12:00:00.000Z",
-    type: "cleaning",
-    notes: "Focus on kitchen and bathrooms",
-    createdAt: "2023-04-01T00:00:00.000Z",
-    updatedAt: "2023-04-01T00:00:00.000Z"
-  },
-  "event2": {
-    id: "event2",
-    title: "Fix Shower",
-    propertyId: "prop2",
-    assignedTo: "emp1",
-    startDate: "2023-04-16T15:00:00.000Z",
-    endDate: "2023-04-16T16:30:00.000Z",
-    type: "maintenance",
-    notes: "Replace shower head and check for leaks",
-    createdAt: "2023-04-02T00:00:00.000Z",
-    updatedAt: "2023-04-02T00:00:00.000Z"
-  },
-  // ... more calendar event data
-};
-
-// Data provider component
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [properties, setProperties] = useState<Record<string, Property>>(mockProperties);
-  const [employees, setEmployees] = useState<Record<string, Employee>>(mockEmployees);
-  const [checklists, setChecklists] = useState<Record<string, Checklist>>(mockChecklists);
-  const [accessCodes, setAccessCodes] = useState<Record<string, AccessCode>>(mockAccessCodes);
-  const [maintenanceRequests, setMaintenanceRequests] = useState<Record<string, MaintenanceRequest>>(mockMaintenanceRequests);
-  const [events, setEvents] = useState<Record<string, CalendarEvent>>(mockEvents);
+  const [properties, setProperties] = useState<Record<string, Property>>({});
+  const [employees, setEmployees] = useState<Record<string, Employee>>({});
+  const [checklists, setChecklists] = useState<Record<string, Checklist>>({});
+  const [accessCodes, setAccessCodes] = useState<Record<string, AccessCode>>({});
+  const [maintenanceRequests, setMaintenanceRequests] = useState<Record<string, MaintenanceRequest>>({});
+  const [events, setEvents] = useState<Record<string, CalendarEvent>>({});
 
-  // Helper functions to get items by ID
+  const fetchData = async <T extends { id: string }>(tableName: string, setter: (data: Record<string, T>) => void) => {
+    const { data, error } = await supabase.from(tableName).select('*');
+    if (error) {
+      console.error(`Erro ao buscar dados de ${tableName}:`, error);
+    } else {
+      const dataMap = (data || []).reduce((acc, item) => {
+        acc[item.id] = item as T;
+        return acc;
+      }, {} as Record<string, T>);
+      setter(dataMap);
+    }
+  };
+
+  useEffect(() => {
+    fetchData<Property>('properties', setProperties);
+    fetchData<Employee>('employees', setEmployees);
+    fetchData<Checklist>('checklists', setChecklists);
+    fetchData<AccessCode>('access_codes', setAccessCodes);
+    fetchData<MaintenanceRequest>('maintenance_requests', setMaintenanceRequests);
+    fetchData<CalendarEvent>('calendar_events', setEvents);
+  }, []);
+
+  // --- Funções Helper para Obter Itens por ID ---
   const getPropertyById = (id: string) => properties[id];
   const getEmployeeById = (id: string) => employees[id];
   const getChecklistById = (id: string) => checklists[id];
@@ -213,8 +106,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const getMaintenanceRequestById = (id: string) => maintenanceRequests[id];
   const getEventById = (id: string) => events[id];
 
-  // Helper functions to get filtered items
-  const getPropertiesByRegion = (region: string) => 
+  // --- Funções Helper para Obter Itens Filtrados ---
+  const getPropertiesByRegion = (region: string) =>
     Object.values(properties).filter(p => p.region === region);
   
   const getChecklistsByPropertyId = (propertyId: string) =>
@@ -241,6 +134,212 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const getEventsByAssignee = (assigneeId: string) =>
     Object.values(events).filter(e => e.assignedTo === assigneeId);
 
+  // --- Funções para Manipular Dados (interagem com Supabase e atualizam o estado local) ---
+
+  // Propriedades
+  const addProperty = async (property: Partial<Property>): Promise<Property> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated.");
+    
+    // Supondo que o DB gera o ID e timestamps automaticamente.
+    // Incluí user_id aqui. Certifique-se de que sua tabela properties tem a coluna user_id.
+    const propertyToInsert = { ...property, user_id: user.id };
+    const { data, error } = await supabase.from('properties').insert([propertyToInsert]).select().single();
+    if (error) throw error;
+    if (data) {
+      setProperties(prev => ({ ...prev, [data.id]: data as Property }));
+      return data as Property;
+    }
+    throw new Error("Failed to add property, no data returned.");
+  };
+
+  const updateProperty = async (property: Property): Promise<Property> => {
+    // Supondo que 'updatedAt' seja atualizado automaticamente pelo DB ou no frontend
+    const propertyToUpdate = { ...property, updatedAt: new Date().toISOString() };
+    const { data, error } = await supabase.from('properties').update(propertyToUpdate).eq('id', property.id).select().single();
+    if (error) throw error;
+    if (data) {
+      setProperties(prev => ({ ...prev, [data.id]: data as Property }));
+      return data as Property;
+    }
+    throw new Error("Failed to update property, no data returned.");
+  };
+
+  const removeProperty = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('properties').delete().eq('id', id);
+    if (error) throw error;
+    setProperties(prev => {
+      const newProps = { ...prev };
+      delete newProps[id];
+      return newProps;
+    });
+  };
+
+  // Funcionários
+  const addEmployee = async (employee: Partial<Employee>): Promise<Employee> => {
+    // Supondo que o DB gera o ID e timestamps automaticamente.
+    // 'properties' é text[] no DB para simplificar.
+    const employeeToInsert = { ...employee, properties: employee.properties || [] };
+    const { data, error } = await supabase.from('employees').insert([employeeToInsert]).select().single();
+    if (error) throw error;
+    if (data) {
+      setEmployees(prev => ({ ...prev, [data.id]: data as Employee }));
+      return data as Employee;
+    }
+    throw new Error("Failed to add employee, no data returned.");
+  };
+
+  const updateEmployee = async (employee: Employee): Promise<Employee> => {
+    const employeeToUpdate = { ...employee, updatedAt: new Date().toISOString() }; // Add updatedAt to Employee type if not present
+    const { data, error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id).select().single();
+    if (error) throw error;
+    if (data) {
+      setEmployees(prev => ({ ...prev, [data.id]: data as Employee }));
+      return data as Employee;
+    }
+    throw new Error("Failed to update employee, no data returned.");
+  };
+
+  const removeEmployee = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('employees').delete().eq('id', id);
+    if (error) throw error;
+    setEmployees(prev => {
+      const newEmployees = { ...prev };
+      delete newEmployees[id];
+      return newEmployees;
+    });
+  };
+
+  // Checklists
+  const addChecklist = async (checklist: Partial<Checklist>): Promise<Checklist> => {
+    const checklistToInsert = { ...checklist, items: checklist.items || [] };
+    const { data, error } = await supabase.from('checklists').insert([checklistToInsert]).select().single();
+    if (error) throw error;
+    if (data) {
+      setChecklists(prev => ({ ...prev, [data.id]: data as Checklist }));
+      return data as Checklist;
+    }
+    throw new Error("Failed to add checklist, no data returned.");
+  };
+
+  const updateChecklist = async (checklist: Checklist): Promise<Checklist> => {
+    const checklistToUpdate = { ...checklist, updatedAt: new Date().toISOString() };
+    const { data, error } = await supabase.from('checklists').update(checklistToUpdate).eq('id', checklist.id).select().single();
+    if (error) throw error;
+    if (data) {
+      setChecklists(prev => ({ ...prev, [data.id]: data as Checklist }));
+      return data as Checklist;
+    }
+    throw new Error("Failed to update checklist, no data returned.");
+  };
+
+  const removeChecklist = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('checklists').delete().eq('id', id);
+    if (error) throw error;
+    setChecklists(prev => {
+      const newChecklists = { ...prev };
+      delete newChecklists[id];
+      return newChecklists;
+    });
+  };
+
+  // Access Codes
+  const addAccessCode = async (accessCode: Partial<AccessCode>): Promise<AccessCode> => {
+    const { data, error } = await supabase.from('access_codes').insert([accessCode]).select().single();
+    if (error) throw error;
+    if (data) {
+      setAccessCodes(prev => ({ ...prev, [data.id]: data as AccessCode }));
+      return data as AccessCode;
+    }
+    throw new Error("Failed to add access code, no data returned.");
+  };
+
+  const updateAccessCode = async (accessCode: AccessCode): Promise<AccessCode> => {
+    const accessCodeToUpdate = { ...accessCode, updatedAt: new Date().toISOString() };
+    const { data, error } = await supabase.from('access_codes').update(accessCodeToUpdate).eq('id', accessCode.id).select().single();
+    if (error) throw error;
+    if (data) {
+      setAccessCodes(prev => ({ ...prev, [data.id]: data as AccessCode }));
+      return data as AccessCode;
+    }
+    throw new Error("Failed to update access code, no data returned.");
+  };
+
+  const removeAccessCode = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('access_codes').delete().eq('id', id);
+    if (error) throw error;
+    setAccessCodes(prev => {
+      const newCodes = { ...prev };
+      delete newCodes[id];
+      return newCodes;
+    });
+  };
+
+  // Maintenance Requests
+  const addMaintenanceRequest = async (request: Partial<MaintenanceRequest>): Promise<MaintenanceRequest> => {
+    const { data, error } = await supabase.from('maintenance_requests').insert([request]).select().single();
+    if (error) throw error;
+    if (data) {
+      setMaintenanceRequests(prev => ({ ...prev, [data.id]: data as MaintenanceRequest }));
+      return data as MaintenanceRequest;
+    }
+    throw new Error("Failed to add maintenance request, no data returned.");
+  };
+
+  const updateMaintenanceRequest = async (request: MaintenanceRequest): Promise<MaintenanceRequest> => {
+    const requestToUpdate = { ...request, updatedAt: new Date().toISOString() };
+    const { data, error } = await supabase.from('maintenance_requests').update(requestToUpdate).eq('id', request.id).select().single();
+    if (error) throw error;
+    if (data) {
+      setMaintenanceRequests(prev => ({ ...prev, [data.id]: data as MaintenanceRequest }));
+      return data as MaintenanceRequest;
+    }
+    throw new Error("Failed to update maintenance request, no data returned.");
+  };
+
+  const removeMaintenanceRequest = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('maintenance_requests').delete().eq('id', id);
+    if (error) throw error;
+    setMaintenanceRequests(prev => {
+      const newRequests = { ...prev };
+      delete newRequests[id];
+      return newRequests;
+    });
+  };
+
+  // Calendar Events
+  const addEvent = async (event: Partial<CalendarEvent>): Promise<CalendarEvent> => {
+    const { data, error } = await supabase.from('calendar_events').insert([event]).select().single();
+    if (error) throw error;
+    if (data) {
+      setEvents(prev => ({ ...prev, [data.id]: data as CalendarEvent }));
+      return data as CalendarEvent;
+    }
+    throw new Error("Failed to add event, no data returned.");
+  };
+
+  const updateEvent = async (event: CalendarEvent): Promise<CalendarEvent> => {
+    const eventToUpdate = { ...event, updatedAt: new Date().toISOString() };
+    const { data, error } = await supabase.from('calendar_events').update(eventToUpdate).eq('id', event.id).select().single();
+    if (error) throw error;
+    if (data) {
+      setEvents(prev => ({ ...prev, [data.id]: data as CalendarEvent }));
+      return data as CalendarEvent;
+    }
+    throw new Error("Failed to update event, no data returned.");
+  };
+
+  const removeEvent = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+    if (error) throw error;
+    setEvents(prev => {
+      const newEvents = { ...prev };
+      delete newEvents[id];
+      return newEvents;
+    });
+  };
+
+
   return (
     <DataContext.Provider
       value={{
@@ -250,12 +349,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         accessCodes,
         maintenanceRequests,
         events,
-        setProperties,
-        setEmployees,
-        setChecklists,
-        setAccessCodes,
-        setMaintenanceRequests,
-        setEvents,
+        // Funções de obtenção
         getPropertyById,
         getEmployeeById,
         getChecklistById,
@@ -269,7 +363,26 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         getMaintenanceRequestsByPropertyId,
         getMaintenanceRequestsByRegion,
         getEventsByPropertyId,
-        getEventsByAssignee
+        getEventsByAssignee,
+        // Funções de manipulação de dados
+        addProperty,
+        updateProperty,
+        removeProperty,
+        addEmployee,
+        updateEmployee,
+        removeEmployee,
+        addChecklist,
+        updateChecklist,
+        removeChecklist,
+        addAccessCode,
+        updateAccessCode,
+        removeAccessCode,
+        addMaintenanceRequest,
+        updateMaintenanceRequest,
+        removeMaintenanceRequest,
+        addEvent,
+        updateEvent,
+        removeEvent,
       }}
     >
       {children}

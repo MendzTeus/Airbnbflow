@@ -1,4 +1,4 @@
-
+// src/hooks/use-employees.ts
 import { useMemo } from 'react';
 import { useData } from './use-data';
 import { Employee } from '@/types';
@@ -21,6 +21,8 @@ export const useEmployees = () => {
     if (!region) return employeesArray;
     
     return employeesArray.filter(employee => {
+      // Assuming 'properties' array on employee contains IDs.
+      // And properties in DataContext have a 'region' field.
       return employee.properties?.some(propertyId => {
         const property = propertiesArray.find(p => p.id === propertyId);
         return property && property.region === region;

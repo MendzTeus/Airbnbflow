@@ -1,4 +1,4 @@
-
+// src/pages/Dashboard.tsx
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { format, parseISO, isToday } from "date-fns";
@@ -22,132 +22,50 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/hooks/use-translation";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useData } from "@/hooks/use-data"; // Importar useData
 import { CalendarEvent, Property, Employee } from "@/types";
-
-// Mock data for dashboard stats
-const MOCK_STATS = {
-  properties: 12,
-  occupancy: 85,
-  employees: 8,
-  pendingChecklists: 5,
-  completedChecklists: 18,
-  maintenanceRequests: 3,
-  accessCodes: 15,
-  recentActivity: [
-    { id: 1, message: "New maintenance request for Oceanview Apartment", time: "2 hours ago" },
-    { id: 2, message: "Sarah completed checklist for Downtown Loft", time: "5 hours ago" },
-    { id: 3, message: "New property added: Mountain Retreat", time: "1 day ago" },
-    { id: 4, message: "Access code updated for Beachfront Villa", time: "2 days ago" }
-  ]
-};
-
-// Mock calendar events
-const MOCK_EVENTS: CalendarEvent[] = [
-  {
-    id: "1",
-    title: "Checkout Cleaning",
-    propertyId: "1",
-    assignedTo: "2",
-    startDate: new Date().toISOString(), // Today
-    endDate: new Date(new Date().setHours(new Date().getHours() + 2)).toISOString(),
-    type: "cleaning",
-    notes: "Deep clean after guests leave",
-    createdAt: "2025-04-10T00:00:00.000Z",
-    updatedAt: "2025-04-10T00:00:00.000Z"
-  },
-  {
-    id: "2",
-    title: "Maintenance Check",
-    propertyId: "2",
-    assignedTo: "3",
-    startDate: new Date().toISOString(), // Today
-    endDate: new Date(new Date().setHours(new Date().getHours() + 1)).toISOString(),
-    type: "maintenance",
-    notes: "Fix leaking faucet",
-    createdAt: "2025-04-12T00:00:00.000Z",
-    updatedAt: "2025-04-12T00:00:00.000Z"
-  }
-];
-
-// Mock properties and employees for reference
-const MOCK_PROPERTIES: Record<string, Property> = {
-  "1": {
-    id: "1",
-    name: "Oceanview Apartment",
-    address: "123 Coastal Highway",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33101",
-    bedrooms: 2,
-    bathrooms: 2,
-    imageUrl: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2",
-    description: "Beautiful oceanfront apartment with stunning views",
-    createdAt: "2023-01-15T00:00:00.000Z",
-    updatedAt: "2023-01-15T00:00:00.000Z"
-  },
-  "2": {
-    id: "2",
-    name: "Downtown Loft",
-    address: "456 Main Street",
-    city: "Chicago",
-    state: "IL",
-    zipCode: "60601",
-    bedrooms: 1,
-    bathrooms: 1,
-    imageUrl: "https://images.unsplash.com/photo-1560448075-32cafe5eb046",
-    description: "Modern loft in the heart of downtown",
-    createdAt: "2023-02-10T00:00:00.000Z",
-    updatedAt: "2023-02-10T00:00:00.000Z"
-  }
-};
-
-const MOCK_EMPLOYEES: Record<string, Employee> = {
-  "2": {
-    id: "2",
-    name: "Sarah Cleaner",
-    email: "cleaner@airbnbflow.com",
-    phone: "555-987-6543",
-    role: "cleaner",
-    startDate: "2023-02-15T00:00:00.000Z",
-    properties: ["1", "3", "4"]
-  },
-  "3": {
-    id: "3",
-    name: "Mike Johnson",
-    email: "mike@airbnbflow.com",
-    phone: "555-555-1234",
-    role: "cleaner",
-    startDate: "2023-03-20T00:00:00.000Z",
-    properties: ["2"]
-  }
-};
+import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { language } = useSettings();
-  
-  const [stats, setStats] = useState(MOCK_STATS);
-  const [todayEvents, setTodayEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { properties, employees, maintenanceRequests, events } = useData(); // Obter dados do useData
+
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+
+  // Derivar estatísticas dos dados reais
+  const stats = {
+    properties: Object.keys(properties).length,
+    // A ocupação é complexa e dependeria de dados de reservas,
+    // manteremos um valor mockado ou simplificado por enquanto
+    occupancy: 85, 
+    employees: Object.keys(employees).length,
+    pendingMaintenanceRequests: Object.values(maintenanceRequests).filter(req => req.status !== "completed").length,
+    // Recents activity é mockado para não complicar demais o escopo
+    recentActivity: [
+      { id: 1, message: "New maintenance request for Oceanview Apartment", time: "2 hours ago" },
+      { id: 2, message: "Sarah completed checklist for Downtown Loft", time: "5 hours ago" },
+      { id: 3, message: "New property added: Mountain Retreat", time: "1 day ago" },
+      { id: 4, message: "Access code updated for Beachfront Villa", time: "2 days ago" }
+    ]
+  };
+
+  const todayEvents = Object.values(events).filter(event => {
+    const eventDate = parseISO(event.startDate);
+    return isToday(eventDate);
+  }).sort((a, b) => parseISO(a.startDate).getTime() - parseISO(b.startDate).getTime());
 
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => {
-      setLoading(false);
-      
-      // Get today's events
-      const today = new Date();
-      const eventsToday = MOCK_EVENTS.filter(event => {
-        const eventDate = parseISO(event.startDate);
-        return isToday(eventDate);
-      });
-      
-      setTodayEvents(eventsToday);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    // Definir loading como false quando todos os dados do DataContext forem carregados
+    // Uma forma simples é verificar se há algum dado carregado
+    if (Object.keys(properties).length > 0 || Object.keys(employees).length > 0) {
+      setDashboardLoading(false);
+    }
+    // Uma abordagem mais robusta seria ter um isLoading global no DataContext
+    // ou usar react-query com isLoading para cada fetch.
+  }, [properties, employees, maintenanceRequests, events]);
+
 
   const DashboardCard = ({ 
     title, 
@@ -197,11 +115,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {loading ? (
+      {dashboardLoading ? (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="w-full h-[180px] animate-pulse">
-              <div className="h-full bg-muted/50"></div>
+              <Skeleton className="h-full w-full" />
             </Card>
           ))}
         </div>
@@ -243,9 +161,9 @@ export default function Dashboard() {
             
             <DashboardCard
               title={t("dashboard.maintenanceRequests")}
-              value={stats.maintenanceRequests}
+              value={stats.pendingMaintenanceRequests} // Usar requests pendentes
               icon={Wrench}
-              description={`${stats.maintenanceRequests} ${t("dashboard.pendingRequests")}`}
+              description={`${stats.pendingMaintenanceRequests} ${t("dashboard.pendingRequests")}`}
               linkTo="/maintenance"
               color="bg-amber-100"
             />
@@ -273,8 +191,8 @@ export default function Dashboard() {
                 ) : (
                   <div className="space-y-3">
                     {todayEvents.map(event => {
-                      const property = MOCK_PROPERTIES[event.propertyId];
-                      const employee = MOCK_EMPLOYEES[event.assignedTo];
+                      const property = properties[event.propertyId]; // Obter da data real
+                      const employee = employees[event.assignedTo || '']; // Obter da data real
                       
                       return (
                         <div 
@@ -299,7 +217,7 @@ export default function Dashboard() {
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              {property?.name} • {employee?.name}
+                              {property?.name} • {employee?.name || t("calendar.unassigned")}
                             </p>
                           </div>
                         </div>

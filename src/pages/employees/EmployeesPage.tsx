@@ -1,4 +1,4 @@
-
+// src/pages/employees/EmployeesPage.tsx
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, Plus, Search, Mail, Phone, Calendar, Edit, Trash2, Building } from "lucide-react";
@@ -8,67 +8,43 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/hooks/use-data"; // Importar useData
 import { Employee } from "@/types";
-
-// Mock employee data
-const MOCK_EMPLOYEES: Employee[] = [
-  {
-    id: "1",
-    name: "John Manager",
-    email: "manager@airbnbflow.com",
-    phone: "555-123-4567",
-    role: "manager",
-    startDate: "2023-01-10T00:00:00.000Z",
-    properties: ["1", "2"]
-  },
-  {
-    id: "2",
-    name: "Sarah Cleaner",
-    email: "cleaner@airbnbflow.com",
-    phone: "555-987-6543",
-    role: "cleaner",
-    startDate: "2023-02-15T00:00:00.000Z",
-    properties: ["1", "3", "4"]
-  },
-  {
-    id: "3",
-    name: "Mike Johnson",
-    email: "mike@airbnbflow.com",
-    phone: "555-555-1234",
-    role: "cleaner",
-    startDate: "2023-03-20T00:00:00.000Z",
-    properties: ["2"]
-  }
-];
+import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
 
 export default function EmployeesPage() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
+  const { employees, removeEmployee } = useData(); // Obter dados do useData
   
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setEmployees(MOCK_EMPLOYEES);
+    // Definir loading como false quando os funcionários forem carregados
+    if (Object.keys(employees).length > 0) {
       setLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    } else {
+      const timer = setTimeout(() => {
+        if (Object.keys(employees).length === 0) {
+          setLoading(false);
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [employees]);
   
-  const filteredEmployees = employees.filter(employee =>
+  const employeesArray = Object.values(employees); // Converte o objeto de employees em um array
+
+  const filteredEmployees = employeesArray.filter(employee =>
     employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     employee.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDelete = (id: string) => {
-    // In a real app, this would call an API to delete the employee
-    setEmployees(employees.filter(e => e.id !== id));
+  const handleDelete = async (id: string) => {
+    await removeEmployee(id);
   };
 
   return (
@@ -111,7 +87,7 @@ export default function EmployeesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="overflow-hidden h-[180px] animate-pulse">
-              <div className="h-full bg-muted/50"></div>
+              <Skeleton className="h-full w-full" />
             </Card>
           ))}
         </div>
@@ -243,7 +219,7 @@ export default function EmployeesPage() {
                       </div>
                       <div className="flex items-center">
                         <Building className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{employee.properties.length} properties</span>
+                        <span>Assigned to {employee.properties.length} properties</span>
                       </div>
                     </div>
                   </div>

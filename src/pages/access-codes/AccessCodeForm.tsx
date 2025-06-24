@@ -1,4 +1,4 @@
-
+// src/pages/access-codes/AccessCodeForm.tsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/use-translation";
@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "@/hooks/use-toast";
+import { useData } from "@/hooks/use-data"; // Importar useData
 import { 
   Card, 
   CardContent, 
@@ -40,33 +41,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, ArrowLeft } from "lucide-react";
 
-// Mock data for properties
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: "1",
-    name: "Beach House",
-    address: "123 Ocean Drive",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33139",
-    bedrooms: 3,
-    bathrooms: 2,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Mountain Cabin",
-    address: "45 Alpine Road",
-    city: "Aspen",
-    state: "CO",
-    zipCode: "81611",
-    bedrooms: 2,
-    bathrooms: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+// Removido MOCK_PROPERTIES
 
 // Access code form schema
 const accessCodeSchema = z.object({
@@ -93,35 +68,9 @@ export default function AccessCodeForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { getAccessCodeById, addAccessCode, updateAccessCode, properties: allProperties } = useData(); // Obter dados e funções do useData
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = !!id;
-
-  // Simulated fetch of access code for edit mode
-  const [accessCode, setAccessCode] = useState<{
-    id: string;
-    propertyId: string;
-    name: string;
-    code: string;
-    expiresAt?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (isEditMode) {
-      // In a real app, this would be an API call to fetch the access code
-      // For now, simulate a delay
-      const timer = setTimeout(() => {
-        setAccessCode({
-          id: "1",
-          propertyId: "1",
-          name: "Front Door",
-          code: "1234",
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        });
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isEditMode, id]);
 
   const form = useForm<z.infer<typeof accessCodeSchema>>({
     resolver: zodResolver(accessCodeSchema),
@@ -134,36 +83,59 @@ export default function AccessCodeForm() {
     },
   });
 
-  // Update form when access code is loaded
   useEffect(() => {
-    if (accessCode) {
-      form.reset({
-        propertyId: accessCode.propertyId,
-        name: accessCode.name,
-        code: accessCode.code,
-        noExpiry: !accessCode.expiresAt,
-        expiresAt: accessCode.expiresAt ? new Date(accessCode.expiresAt) : undefined,
-      });
+    if (isEditMode) {
+      const accessCode = getAccessCodeById(id);
+      if (accessCode) {
+        form.reset({
+          propertyId: accessCode.propertyId,
+          name: accessCode.name,
+          code: accessCode.code,
+          noExpiry: !accessCode.expiryDate,
+          expiresAt: accessCode.expiryDate ? new Date(accessCode.expiryDate) : undefined,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Access code not found.",
+        });
+        navigate("/access-codes"); // Redirecionar se não encontrar
+      }
     }
-  }, [accessCode, form]);
+  }, [isEditMode, id, getAccessCodeById, form, navigate, toast]);
 
   const onSubmit = async (values: z.infer<typeof accessCodeSchema>) => {
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // In a real app, this would be an actual API call to create/update the access code
-    toast({
-      title: isEditMode 
-        ? "Access code updated" 
-        : "Access code created",
-      description: isEditMode 
-        ? "The access code has been updated successfully." 
-        : "A new access code has been created.",
-    });
-    
-    setIsSubmitting(false);
+    try {
+      const accessCodeData = {
+        ...values,
+        expiryDate: values.noExpiry ? undefined : values.expiresAt?.toISOString(),
+      };
+
+      if (isEditMode) {
+        await updateAccessCode({ ...accessCodeData, id: id } as AccessCode);
+        toast({
+          title: "Access code updated",
+          description: "The access code has been updated successfully.",
+        });
+      } else {
+        await addAccessCode(accessCodeData);
+        toast({
+          title: "Access code created",
+          description: "A new access code has been created.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to save access code. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
     navigate("/access-codes");
   };
 
@@ -216,7 +188,7 @@ export default function AccessCodeForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {MOCK_PROPERTIES.map((property) => (
+                        {Object.values(allProperties).map((property) => (
                           <SelectItem key={property.id} value={property.id}>
                             {property.name}
                           </SelectItem>
