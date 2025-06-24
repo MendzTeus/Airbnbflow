@@ -1,6 +1,6 @@
-// src/pages/checklists/ChecklistForm.tsx
-import { useState, useEffect, useMemo } from "react"; // Adicionado useMemo
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+// src/pages/properties/PropertyDetail.tsx
+import { useState, useMemo } from "react"; // Adicionado useMemo
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -10,27 +10,16 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,505 +29,572 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, AlertCircle } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useToast } from "@/hooks/use-toast";
-import { useTranslation } from "@/hooks/use-translation";
-// Removidas as importações diretas de useProperties e useEmployees, pois os dados vêm de useData
+import {
+  ChevronLeft,
+  Building,
+  Bed,
+  Bath,
+  MapPin,
+  Home,
+  Calendar,
+  Key,
+  ClipboardList,
+  Wrench,
+  Plus,
+  Edit,
+  Trash
+} from "lucide-react";
+import { format, parseISO } from "date-fns";
+// Removida importação de useProperties, pois getPropertyById e removeProperty virão de useData
 // import { useProperties } from "@/hooks/use-properties";
-// import { useEmployees } from "@/hooks/use-employees";
+import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/hooks/use-data"; // Importar useData
-import { Checklist, ChecklistItem, COMMON_CHECKLIST_ITEMS } from "@/types";
-import { v4 as uuidv4 } from "uuid"; // Para gerar UUID se o DB não gerar
+import { Property, CalendarEvent, AccessCode, MaintenanceRequest, Checklist } from "@/types"; // Mantido tipos
 
-// Removidos os mock data de Checklist, Properties, Employees.
-
-// Form validation schema
-const formSchema = z.object({
-  title: z.string().min(3, {
-    message: "Title must be at least 3 characters.",
-  }),
-  propertyId: z.string({
-    required_error: "Please select a property.",
-  }),
-  assignedTo: z.string().optional(),
-  type: z.enum(["checkin", "checkout", "maintenance"], {
-    required_error: "Please select a checklist type.",
-  }),
-});
-
-// Template options for standard checklists (mantido, pois é uma lógica do frontend)
-const checklistTemplates = [
-  {
-    id: "checkin-standard",
-    name: "Standard Check-in",
-    items: [
-      { id: "ci1", text: "Verify all lights are working", completed: false },
-      { id: "ci2", text: "Check heating/cooling systems", completed: false },
-      { id: "ci3", text: "Ensure kitchen appliances are clean and working", completed: false },
-      { id: "ci4", text: "Check water pressure in all bathrooms", completed: false },
-      { id: "ci5", text: "Verify WiFi is working", completed: false },
-      { id: "ci6", text: "Ensure door locks function properly", completed: false },
-    ]
-  },
-  {
-    id: "checkout-standard",
-    name: "Standard Check-out",
-    items: [
-      { id: "co1", text: "Clean all rooms thoroughly", completed: false },
-      { id: "co2", text: "Sanitize bathrooms", completed: false },
-      { id: "co3", text: "Wash all linens and towels", completed: false },
-      { id: "co4", text: "Ensure no personal items left behind", completed: false },
-      { id: "co5", text: "Take out all trash", completed: false },
-      { id: "co6", text: "Check for any damages", completed: false },
-      { id: "co7", text: "Lock all doors and windows", completed: false },
-    ]
-  },
-  {
-    id: "maintenance-standard",
-    name: "Standard Maintenance",
-    items: [
-      { id: "mt1", text: "Check for plumbing issues", completed: false },
-      { id: "mt2", text: "Inspect HVAC system", completed: false },
-      { id: "mt3", text: "Test all electrical outlets", completed: false },
-      { id: "mt4", text: "Check smoke and CO detectors", completed: false },
-      { id: "mt5", text: "Inspect roof and gutters", completed: false },
-      { id: "mt6", text: "Check for pest issues", completed: false },
-      { id: "mt7", text: "Test appliances", completed: false },
-      { id: "mt8", text: "Inspect windows and doors", completed: false },
-    ]
-  }
-];
-
-export default function ChecklistForm() {
-  const { t } = useTranslation();
-  const { toast } = useToast();
+export default function PropertyDetail() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { id } = useParams(); // ID do checklist, se estiver em modo de edição
-
-  // Obter dados e funções de manipulação do useData
+  const { toast } = useToast();
+  // Obter getPropertyById e removeProperty diretamente do useData
+  // Além disso, obter todos os dados relacionados para filtrar localmente
   const {
     properties,
-    employees,
+    events,
+    accessCodes,
+    maintenanceRequests,
     checklists,
-    getChecklistById,
-    updateChecklist,
-    addChecklist
+    getPropertyById,
+    removeProperty
   } = useData();
 
-  // Converter objetos de dados para arrays
-  const allProperties = useMemo(() => Object.values(properties), [properties]);
-  const allEmployees = useMemo(() => Object.values(employees), [employees]);
+  const [activeTab, setActiveTab] = useState("overview");
 
-  // Carregar o checklist existente em modo de edição
-  const existingChecklist = useMemo(() => {
-    return id ? getChecklistById(id) : null;
-  }, [id, checklists, getChecklistById]); // Depende de 'checklists' do contexto
+  // Load property data from context
+  const property = useMemo(() => {
+    return id ? getPropertyById(id) : null;
+  }, [id, properties, getPropertyById]); // Depende de 'properties' para re-renderizar se a lista de propriedades mudar
 
-  // Form state
-  const [items, setItems] = useState<ChecklistItem[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [newItemText, setNewItemText] = useState("");
-  // Removido selectedRegion, pois não é usado diretamente neste formulário
-  // const [selectedRegion, setSelectedRegion] = useState<string>("all");
+  // Filtrar dados relacionados à propriedade atual
+  const filteredEvents = useMemo(() => {
+    return Object.values(events).filter(event => event.propertyId === id);
+  }, [id, events]);
 
-  // Inicializar formulário com react-hook-form
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: "",
-      propertyId: "",
-      assignedTo: "", // Certifique-se de que o valor padrão para optional seja compatível com Select (string vazia)
-      type: "checkout",
-    },
-    values: useMemo(() => { // Usar useMemo para evitar re-renderizações desnecessárias do formulário
-      if (id && existingChecklist) {
-        return {
-          title: existingChecklist.title,
-          propertyId: existingChecklist.propertyId,
-          assignedTo: existingChecklist.assignedTo || "",
-          type: existingChecklist.type,
-        };
-      }
-      return {
-        title: "",
-        propertyId: "",
-        assignedTo: "",
-        type: "checkout",
-      };
-    }, [id, existingChecklist])
-  });
+  const filteredAccessCodes = useMemo(() => {
+    return Object.values(accessCodes).filter(code => code.propertyId === id);
+  }, [id, accessCodes]);
 
-  // Efeito para carregar os itens do checklist quando o `existingChecklist` é carregado
-  useEffect(() => {
-    if (id && existingChecklist) {
-      setItems(existingChecklist.items || []); // Inicializa os items do checklist
-    } else if (!id) {
-      setItems([]); // Limpa os items quando não está em modo de edição
-    }
-  }, [id, existingChecklist]);
+  const filteredMaintenanceRequests = useMemo(() => {
+    return Object.values(maintenanceRequests).filter(request => request.propertyId === id);
+  }, [id, maintenanceRequests]);
+
+  const filteredChecklists = useMemo(() => {
+    return Object.values(checklists).filter(checklist => checklist.propertyId === id);
+  }, [id, checklists]);
 
 
-  // Load template items
-  const loadTemplate = (templateId: string) => {
-    const template = checklistTemplates.find(t => t.id === templateId);
-    if (template) {
-      // Create new items with unique IDs
-      const newItems = template.items.map(item => ({
-        id: uuidv4(),
-        text: item.text,
-        completed: false
-      }));
-      setItems(newItems);
-      toast({
-        title: "Template Loaded",
-        description: `Loaded ${template.name} template with ${template.items.length} items.`,
-      });
-    }
-  };
-
-  // Add a new item to the checklist
-  const addItem = () => {
-    if (newItemText.trim() === "") return;
-
-    const newItem: ChecklistItem = {
-      id: uuidv4(),
-      text: newItemText,
-      completed: false
-    };
-
-    setItems([...items, newItem]);
-    setNewItemText("");
-  };
-
-  // Remove an item from the checklist
-  const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
-  };
-
-  // Toggle item completion (mantido, pois é um estado interno da UI do formulário)
-  const toggleItem = (id: string) => {
-    setItems(
-      items.map(item =>
-        item.id === id ? { ...item, completed: !item.completed } : item
-      )
-    );
-  };
-
-  // Form submission handler
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (items.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please add at least one item to the checklist.",
-      });
-      return;
-    }
-
-    setSubmitting(true);
-    setError("");
+  // Handle property deletion
+  const handleDeleteProperty = async () => { // Tornar a função async
+    if (!id) return;
 
     try {
-      const checklistData: Checklist = {
-        id: id || uuidv4(), // Usar ID existente ou gerar novo se o Supabase não gerar automaticamente
-        title: values.title,
-        propertyId: values.propertyId,
-        assignedTo: values.assignedTo || undefined,
-        type: values.type,
-        items: items,
-        createdAt: id && existingChecklist ? existingChecklist.createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        completedAt: undefined // Opcional: definir como undefined na criação/edição e atualizar apenas na conclusão
-      };
-
-      if (id) {
-        // Update existing checklist
-        await updateChecklist(checklistData); // Usar updateChecklist do useData
-        toast({
-          title: "Success",
-          description: "Checklist updated successfully.",
-        });
-      } else {
-        // Create new checklist
-        await addChecklist(checklistData); // Usar addChecklist do useData
-        toast({
-          title: "Success",
-          description: "Checklist created successfully.",
-        });
-      }
-
-      navigate("/checklists");
+      await removeProperty(id); // Chamar a função removeProperty do useData
+      toast({
+        title: "Property Deleted",
+        description: "The property has been deleted successfully.",
+      });
+      navigate("/properties");
     } catch (error: any) {
-      console.error("Error saving checklist:", error);
-      setError(error.message || "Failed to save checklist. Please try again.");
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to save checklist. Please try again.",
+        description: error.message || "Failed to delete the property. Please try again.",
       });
-    } finally {
-      setSubmitting(false);
     }
   };
 
-  // Adicionado estado de carregamento inicial, útil se o hook useData ainda estiver buscando os dados
-  const isLoadingData = Object.keys(properties).length === 0 || Object.keys(employees).length === 0 || Object.keys(checklists).length === 0;
+  // Carregamento: a página está carregando se a propriedade ainda não foi encontrada e os dados do contexto ainda não estão populados
+  const isLoading = Object.keys(properties).length === 0 && !property;
 
-  if (isLoadingData) {
+  if (isLoading) {
+    // Pode usar um Skeleton aqui ou um spinner global se preferir
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-full">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  // Se estiver em modo de edição e o checklist não for encontrado após o carregamento dos dados
-  if (id && !existingChecklist && !isLoadingData) {
+  if (!property) {
     return (
-      <div className="text-center py-10">
-        <h3 className="mt-2 text-lg font-semibold">Checklist Not Found</h3>
-        <p className="text-muted-foreground">The checklist you are trying to edit does not exist.</p>
-        <Button onClick={() => navigate("/checklists")} className="mt-4">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Checklists
-        </Button>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold">Property Not Found</h2>
+          <p className="text-muted-foreground mt-2">
+            The property you're looking for doesn't exist or has been removed.
+          </p>
+          <Button asChild className="mt-4">
+            <Link to="/properties">
+              <ChevronLeft className="mr-2 h-4 w-4" /> Back to Properties
+            </Link>
+          </Button>
+        </div>
       </div>
     );
   }
 
-
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">
-          {id ? "Edit Checklist" : "New Checklist"}
-        </h2>
-        <p className="text-muted-foreground mt-2">
-          {id ? "Update an existing checklist" : "Create a new checklist"}
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          <Button variant="outline" size="sm" asChild className="mr-4">
+            <Link to="/properties">
+              <ChevronLeft className="mr-2 h-4 w-4" /> Back
+            </Link>
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">{property.name}</h2>
+            <p className="text-muted-foreground mt-1 flex items-center">
+              <MapPin className="mr-1 h-4 w-4" />
+              {property.address}, {property.city}, {property.state} {property.zipCode}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex space-x-2">
+          <Button asChild variant="outline">
+            <Link to={`/properties/${id}/edit`}>
+              <Edit className="mr-2 h-4 w-4" /> Edit
+            </Link>
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash className="mr-2 h-4 w-4" /> Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the property
+                  and all associated data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteProperty}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Checklist Details</CardTitle>
-          <CardDescription>Basic information about the checklist</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter checklist title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsTrigger value="access-codes">Access Codes</TabsTrigger>
+          <TabsTrigger value="checklists">Checklists</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+        </TabsList>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="propertyId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Property</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={isLoadingData} // Desabilitar enquanto carrega as propriedades
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a property" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {allProperties.map((property) => (
-                            <SelectItem key={property.id} value={property.id}>
-                              {property.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="assignedTo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assigned To</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={isLoadingData} // Desabilitar enquanto carrega os funcionários
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select an assignee" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="unassigned">
-                            Unassigned
-                          </SelectItem>
-                          {allEmployees.map((employee) => (
-                            <SelectItem key={employee.id} value={employee.id}>
-                              {employee.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Person responsible for completing this checklist
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      value={field.value}
-                      disabled={isLoadingData} // Desabilitar enquanto carrega os dados
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="checkin">Check-in</SelectItem>
-                        <SelectItem value="checkout">Check-out</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium">Checklist Items</h3>
-                  <div className="flex space-x-2">
-                    <Select onValueChange={loadTemplate}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Load Template" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {checklistTemplates.map((template) => (
-                          <SelectItem key={template.id} value={template.id}>
-                            {template.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Property Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center">
+                      <Bed className="h-5 w-5 text-muted-foreground mr-2" />
+                      <div>
+                        <div className="text-sm text-muted-foreground">Bedrooms</div>
+                        <div className="font-medium">{property.bedrooms}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <Bath className="h-5 w-5 text-muted-foreground mr-2" />
+                      <div>
+                        <div className="text-sm text-muted-foreground">Bathrooms</div>
+                        <div className="font-medium">{property.bathrooms}</div>
+                      </div>
+                    </div>
                   </div>
+
+                  {property.region && (
+                    <div className="flex items-center">
+                      <Home className="h-5 w-5 text-muted-foreground mr-2" />
+                      <div>
+                        <div className="text-sm text-muted-foreground">Region</div>
+                        <div className="font-medium">{property.region}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-sm text-muted-foreground mb-1">Full Address</div>
+                    <div className="font-medium">
+                      {property.address}<br />
+                      {property.city}, {property.state} {property.zipCode}
+                    </div>
+                  </div>
+
+                  {property.description && (
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-1">Description</div>
+                      <div>{property.description}</div>
+                    </div>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
 
-                {items.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed rounded-md">
-                    <p className="text-muted-foreground">
-                      No items added yet. Add some items to your checklist.
-                    </p>
-                  </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Events</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredEvents.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-6">No upcoming events</p>
                 ) : (
-                  <div className="space-y-2">
-                    {items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 bg-card border rounded-md">
-                        <div className="flex items-center space-x-3">
-                          <Checkbox
-                            id={`item-${item.id}`}
-                            checked={item.completed}
-                            onCheckedChange={() => toggleItem(item.id)}
-                          />
-                          <Label
-                            htmlFor={`item-${item.id}`}
-                            className={`${item.completed ? "line-through text-muted-foreground" : ""}`}
-                          >
-                            {item.text}
-                          </Label>
+                  <div className="space-y-4">
+                    {filteredEvents.map((event) => (
+                      <div key={event.id} className="flex items-start">
+                        <div className="mr-4 p-2 border rounded-md">
+                          <Calendar className="h-5 w-5 text-muted-foreground" />
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeItem(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div>
+                          <div className="font-medium">{event.title}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {format(parseISO(event.startDate), "MMM d, yyyy 'at' h:mm a")} {/* Correção aqui */}
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={`mt-1 ${event.type === 'cleaning' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
+                          >
+                            {event.type}
+                          </Badge>
+                        </div>
                       </div>
                     ))}
+                    <Button asChild className="w-full" variant="outline">
+                      <Link to={`/calendar/new?propertyId=${id}`}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Event
+                      </Link>
+                    </Button>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
 
-                <div className="flex space-x-2">
-                  <Input
-                    placeholder="Add a new item"
-                    value={newItemText}
-                    onChange={(e) => setNewItemText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addItem();
-                      }
-                    }}
-                  />
-                  <Button type="button" onClick={addItem} disabled={!newItemText.trim()}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Item
-                  </Button>
-                </div>
+          {property.imageUrl && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Property Image</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <img
+                  src={property.imageUrl}
+                  alt={property.name}
+                  className="w-full h-auto rounded-md object-cover"
+                />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Calendar Tab */}
+        <TabsContent value="calendar" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Calendar Events</CardTitle>
+                <CardDescription>Scheduled events for this property</CardDescription>
               </div>
-
-              {error && (
-                <div className="bg-destructive/10 p-3 rounded-md flex items-center space-x-2">
-                  <AlertCircle className="h-5 w-5 text-destructive" />
-                  <p className="text-destructive text-sm">{error}</p>
-                </div>
+              <Button asChild>
+                <Link to={`/calendar/new?propertyId=${id}`}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Event
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {filteredEvents.length === 0 ? (
+                <p className="text-center text-muted-foreground py-10">
+                  No events scheduled for this property
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEvents.map(event => (
+                      <TableRow key={event.id}>
+                        <TableCell className="font-medium">{event.title}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={event.type === 'cleaning' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}
+                          >
+                            {event.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {format(parseISO(event.startDate), "MMM d, yyyy 'at' h:mm a")} {/* Correção aqui */}
+                        </TableCell>
+                        <TableCell>{event.assignedTo || "-"}</TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild variant="ghost" size="sm">
+                            {/* Link para o formulário de edição de evento, passando o ID do evento */}
+                            <Link to={`/calendar/${event.id}/edit`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div className="flex justify-end space-x-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/checklists")}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? "Saving..." : (id ? "Update" : "Create")}
-                </Button>
+        {/* Access Codes Tab */}
+        <TabsContent value="access-codes" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Access Codes</CardTitle>
+                <CardDescription>Door codes and access information</CardDescription>
               </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+              <Button asChild>
+                <Link to={`/access-codes/new?propertyId=${id}`}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Code
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {filteredAccessCodes.length === 0 ? (
+                <p className="text-center text-muted-foreground py-10">
+                  No access codes for this property
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Code Name</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Expiry Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAccessCodes.map(code => (
+                      <TableRow key={code.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center">
+                            <Key className="h-4 w-4 mr-2 text-muted-foreground" />
+                            {code.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono">{code.code}</TableCell>
+                        <TableCell>
+                          {code.expiryDate
+                            ? format(parseISO(code.expiryDate), "MMM d, yyyy") {/* Correção aqui */}
+                            : "No expiry date"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild variant="ghost" size="sm">
+                            <Link to={`/access-codes/${code.id}/edit`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Checklists Tab */}
+        <TabsContent value="checklists" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Checklists</CardTitle>
+                <CardDescription>Cleaning and maintenance checklists</CardDescription>
+              </div>
+              <Button asChild>
+                <Link to={`/checklists/new?propertyId=${id}`}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Checklist
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {filteredChecklists.length === 0 ? (
+                <p className="text-center text-muted-foreground py-10">
+                  No checklists for this property
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Checklist</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredChecklists.map(checklist => {
+                      const completedItems = checklist.items.filter(item => item.completed).length;
+                      const totalItems = checklist.items.length;
+                      const isComplete = checklist.completedAt || (totalItems > 0 && completedItems === totalItems);
+
+                      return (
+                        <TableRow key={checklist.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center">
+                              <ClipboardList className="h-4 w-4 mr-2 text-muted-foreground" />
+                              {checklist.title}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {checklist.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={isComplete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
+                            >
+                              {isComplete ? 'Complete' : 'In Progress'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {completedItems} of {totalItems} items
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button asChild variant="ghost" size="sm">
+                              <Link to={`/checklists/${checklist.id}/edit`}>
+                                <Edit className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Maintenance Tab */}
+        <TabsContent value="maintenance" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Maintenance Requests</CardTitle>
+                <CardDescription>Repair and maintenance issues</CardDescription>
+              </div>
+              <Button asChild>
+                <Link to={`/maintenance/new?propertyId=${id}`}>
+                  <Plus className="mr-2 h-4 w-4" /> Report Issue
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {filteredMaintenanceRequests.length === 0 ? (
+                <p className="text-center text-muted-foreground py-10">
+                  No maintenance requests for this property
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Issue</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date Reported</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredMaintenanceRequests.map(request => (
+                      <TableRow key={request.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center">
+                            <Wrench className="h-4 w-4 mr-2 text-muted-foreground" />
+                            {request.title}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                            {request.description}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              request.priority === 'high' ? 'bg-red-100 text-red-800' :
+                              request.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-green-100 text-green-800'
+                            }
+                          >
+                            {request.priority}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              request.status === 'open' ? 'bg-blue-100 text-blue-800' :
+                              request.status === 'in-progress' ? 'bg-purple-100 text-purple-800' :
+                              'bg-green-100 text-green-800'
+                            }
+                          >
+                            {request.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {format(parseISO(request.createdAt), "MMM d, yyyy")} {/* Correção aqui */}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild variant="ghost" size="sm">
+                            <Link to={`/maintenance/${request.id}/edit`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
