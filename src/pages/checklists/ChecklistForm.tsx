@@ -413,8 +413,9 @@ export default function PropertyDetail() {
                         </TableCell>
                         <TableCell className="font-mono">{code.code}</TableCell>
                         <TableCell>
+                          {/* Mostrar data de expiração se houver */}
                           {code.expiryDate
-                            ? format(parseISO(code.expiryDate), "MMM d, yyyy") {/* Correção aqui */}
+                            ? format(parseISO(code.expiryDate), "MMM d, yyyy")
                             : "No expiry date"}
                         </TableCell>
                         <TableCell className="text-right">
