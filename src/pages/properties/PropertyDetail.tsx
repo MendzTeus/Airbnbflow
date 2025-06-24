@@ -253,7 +253,8 @@ export default function PropertyDetail() {
                   <p className="text-muted-foreground text-center py-6">No upcoming events</p>
                 ) : (
                   <div className="space-y-4">
-                    {events.slice(0,2).map((event) => ( {/* Limitar a 2 eventos para o overview */}
+                    {/* Limitar a 2 eventos para o overview */}
+                    {events.slice(0,2).map((event) => (
                       <div key={event.id} className="flex items-start">
                         <div className="mr-4 p-2 border rounded-md">
                           <Calendar className="h-5 w-5 text-muted-foreground" />
