@@ -27,14 +27,32 @@ import { useData } from "@/hooks/use-data"; // Importar useData
 import { useToast } from "@/hooks/use-toast"; // Importar useToast
 
 // Removido MOCK_PROPERTIES
-// Removido US_STATES - pode ser movido para um arquivo de constantes ou diretamente no código
+// Local STATES_BY_COUNTRY constant; consider moving to a constants file.
+// The user's country is detected from the browser locale and the
+// appropriate list of states/regions is used.
 
-const US_STATES = [
-  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", 
-  "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
-  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", 
-  "VA", "WA", "WV", "WI", "WY"
-];
+const STATES_BY_COUNTRY: Record<string, string[]> = {
+  US: [
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
+    "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT",
+    "VA", "WA", "WV", "WI", "WY"
+  ],
+  BR: [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+    "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+  ],
+  GB: ["England", "Scotland", "Wales", "Northern Ireland"]
+};
+
+const getUserCountryCode = (): string => {
+  const locale = navigator.language || "";
+  const parts = locale.split("-");
+  if (parts.length > 1) {
+    return parts[1].toUpperCase();
+  }
+  return "US";
+};
 
 export default function PropertyForm() {
   const navigate = useNavigate();
@@ -42,6 +60,9 @@ export default function PropertyForm() {
   const isEditing = !!id;
   const { getPropertyById, addProperty, updateProperty } = useData(); // Obter funções do useData
   const { toast } = useToast();
+
+  const [countryCode] = useState<string>(getUserCountryCode());
+  const availableStates = STATES_BY_COUNTRY[countryCode] || STATES_BY_COUNTRY.US;
 
   const [formData, setFormData] = useState<Partial<Property>>({
     name: "",
@@ -229,7 +250,7 @@ export default function PropertyForm() {
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                   <SelectContent>
-                    {US_STATES.map(state => (
+                    {availableStates.map(state => (
                       <SelectItem key={state} value={state}>{state}</SelectItem>
                     ))}
                   </SelectContent>
