@@ -119,7 +119,7 @@ export default function AccessCodesPage() {
               <Building className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-2 text-lg font-semibold">No access codes found</h3>
               <p className="text-muted-foreground">
-                {searchQuery ? "Try adjusting your search terms" : "Add an access code to get started"}
+                {searchTerm ? "Try adjusting your search terms" : "Add an access code to get started"}
               </p>
             </div>
           ) : (
