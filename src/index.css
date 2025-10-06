@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+.page-fade {
+  animation: pageFadeIn 0.3s ease-in-out;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer base {
   :root {
     /* Main colors - Airbnb inspired teal/blue theme */

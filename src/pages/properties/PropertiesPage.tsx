@@ -42,12 +42,15 @@ export default function PropertiesPage() {
   const filteredProperties = propertiesArray.filter(property =>
     property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     property.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    property.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    property.state.toLowerCase().includes(searchQuery.toLowerCase())
+    property.city.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleDelete = async (id: string) => {
-    await removeProperty(id);
+    try {
+      await removeProperty(id);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
@@ -123,7 +126,7 @@ export default function PropertiesPage() {
                   <div className="flex items-center text-muted-foreground text-sm">
                     <MapPin className="mr-1 h-3.5 w-3.5" />
                     <span className="truncate">
-                      {property.city}, {property.state}
+                      {property.city}
                     </span>
                   </div>
                   
@@ -190,7 +193,7 @@ export default function PropertiesPage() {
                     
                     <div className="flex items-center text-muted-foreground text-sm">
                       <MapPin className="mr-1 h-3.5 w-3.5" />
-                      <span>{property.address}, {property.city}, {property.state} {property.zipCode}</span>
+                      <span>{property.address}, {property.city} {property.zipCode}</span>
                     </div>
                     
                     {property.description && (

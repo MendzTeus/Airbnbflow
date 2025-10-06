@@ -103,7 +103,7 @@ export default function AccessCodeForm() {
         navigate("/access-codes"); // Redirecionar se não encontrar
       }
     }
-  }, [isEditMode, id, getAccessCodeById, form, navigate, toast]);
+  }, [isEditMode, id, getAccessCodeById, form, navigate]);
 
   const onSubmit = async (values: z.infer<typeof accessCodeSchema>) => {
     setIsSubmitting(true);
@@ -116,27 +116,16 @@ export default function AccessCodeForm() {
 
       if (isEditMode) {
         await updateAccessCode({ ...accessCodeData, id: id } as AccessCode);
-        toast({
-          title: "Access code updated",
-          description: "The access code has been updated successfully.",
-        });
       } else {
         await addAccessCode(accessCodeData);
-        toast({
-          title: "Access code created",
-          description: "A new access code has been created.",
-        });
       }
-    } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err.message || "Failed to save access code. Please try again.",
-      });
+
+      navigate("/access-codes");
+    } catch (err: unknown) {
+      console.error(err);
     } finally {
       setIsSubmitting(false);
     }
-    navigate("/access-codes");
   };
 
   const noExpiry = form.watch("noExpiry");

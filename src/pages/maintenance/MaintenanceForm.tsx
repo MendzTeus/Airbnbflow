@@ -1,11 +1,12 @@
 // src/pages/maintenance/MaintenanceForm.tsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/use-translation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import type { MaintenanceRequest } from "@/types";
 import {
   Card,
   CardContent,
@@ -34,7 +35,6 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Property, Employee } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import { useData } from "@/hooks/use-data";
 
@@ -70,12 +70,14 @@ export default function MaintenanceForm() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { properties, employees, getMaintenanceRequestById, addMaintenanceRequest, updateMaintenanceRequest } = useData();
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = !!id;
   const location = useLocation();
 
   const allProperties = Object.values(properties);
   const allEmployees = Object.values(employees);
+  const UNASSIGNED_OPTION = "__unassigned__";
 
   const form = useForm<z.infer<typeof maintenanceSchema>>({
     resolver: zodResolver(maintenanceSchema),
@@ -100,7 +102,7 @@ export default function MaintenanceForm() {
           description: maintenanceRequest.description,
           priority: maintenanceRequest.priority,
           status: maintenanceRequest.status,
-          assignedTo: maintenanceRequest.assignedTo || "",
+          assignedTo: maintenanceRequest.assignedTo ?? undefined,
         });
       } else {
         toast({
@@ -118,7 +120,7 @@ export default function MaintenanceForm() {
             form.setValue("propertyId", propertyIdFromUrl);
         }
     }
-  }, [isEditMode, id, getMaintenanceRequestById, form, navigate, toast, location.search]);
+  }, [isEditMode, id, getMaintenanceRequestById, form, navigate, location.search, toast]);
 
 
   const onSubmit = async (values: z.infer<typeof maintenanceSchema>) => {
@@ -319,8 +321,10 @@ export default function MaintenanceForm() {
                   <FormItem>
                     <FormLabel>{t("maintenance.assignedTo")}</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ""}
+                      onValueChange={(value) =>
+                        field.onChange(value === UNASSIGNED_OPTION ? undefined : value)
+                      }
+                      value={field.value ?? UNASSIGNED_OPTION}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -328,7 +332,7 @@ export default function MaintenanceForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Unassigned</SelectItem>
+                        <SelectItem value={UNASSIGNED_OPTION}>Unassigned</SelectItem>
                         {allEmployees.map((employee) => (
                           <SelectItem key={employee.id} value={employee.id}>
                             {employee.name} ({employee.role})

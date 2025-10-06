@@ -67,7 +67,6 @@ export default function ChecklistsPage() {
         property?.name,
         property?.address,
         property?.city,
-        property?.state,
         employee?.name
       ].filter(Boolean).join(" ").toLowerCase();
       
@@ -75,7 +74,11 @@ export default function ChecklistsPage() {
     });
 
   const handleDelete = async (id: string) => {
-    await removeChecklist(id);
+    try {
+      await removeChecklist(id);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (

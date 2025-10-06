@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Outlet, Navigate } from "react-router-dom";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Menu } from "lucide-react";
@@ -15,6 +15,7 @@ export function AppLayout() {
   const isMobile = useIsMobile();
   const { theme } = useSettings();
   const { t } = useTranslation();
+  const location = useLocation();
 
   // Close mobile sidebar when changing screen size
   useEffect(() => {
@@ -66,13 +67,15 @@ export function AppLayout() {
             <Button variant="ghost" size="icon" onClick={toggleMobileSidebar}>
               <Menu size={24} />
             </Button>
-            <h1 className="text-xl font-bold text-primary ml-2">airbnbFlow</h1>
+            <h1 className="text-xl font-bold text-primary ml-2">MCRh</h1>
           </div>
         )}
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-4 md:p-6">
-          <Outlet />
+          <div key={location.pathname} className="page-fade">
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>

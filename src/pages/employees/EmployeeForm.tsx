@@ -162,7 +162,7 @@ export default function EmployeeForm() {
         <p className="text-muted-foreground">
           {isEditing 
             ? "Update employee details and property assignments" 
-            : "Add a new team member to your airbnbFlow team"
+            : "Add a new team member to your MCRh team"
           }
         </p>
       </div>
@@ -283,7 +283,7 @@ export default function EmployeeForm() {
                             {property.name}
                           </Label>
                           <p className="text-sm text-muted-foreground">
-                            {property.city}, {property.state}
+                            {property.city}
                           </p>
                         </div>
                       </div>

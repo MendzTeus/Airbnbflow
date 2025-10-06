@@ -1,13 +1,13 @@
 
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { 
-  Home, 
-  Building, 
-  Users, 
-  ClipboardCheck, 
-  Key, 
-  Wrench, 
+import {
+  Home,
+  Building,
+  Users,
+  ClipboardCheck,
+  Key,
+  Wrench,
   User,
   LogOut,
   ChevronLeft,
@@ -16,7 +16,7 @@ import {
   Moon,
   Sun,
   Languages,
-  Calendar
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +53,11 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
       href: "/dashboard",
     },
     {
+      name: t("common.timeClock"),
+      icon: Clock,
+      href: "/time-clock",
+    },
+    {
       name: t("common.properties"),
       icon: Building,
       href: "/properties",
@@ -78,11 +83,6 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
       href: "/maintenance",
     },
     {
-      name: t("common.calendar"),
-      icon: Calendar,
-      href: "/calendar",
-    },
-    {
       name: t("common.profile"),
       icon: User,
       href: "/profile",
@@ -100,7 +100,7 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
       <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
         {!collapsed && (
           <h1 className="text-xl font-bold text-primary truncate">
-            airbnbFlow
+            MCRh
           </h1>
         )}
         <Button 
@@ -140,6 +140,12 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
       </div>
 
       <div className="p-2 border-t border-sidebar-border space-y-2">
+        {!collapsed && user && (
+          <div className="px-3 py-2 text-xs text-muted-foreground">
+            <div className="font-medium text-sidebar-foreground">{user.name}</div>
+            <div>{user.role}</div>
+          </div>
+        )}
         {/* Theme toggle */}
         {!collapsed ? (
           <div className="flex justify-between items-center px-3 py-2">

@@ -22,6 +22,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { useData } from "@/hooks/use-data"; // Importar useData
+import { supabase } from "@/lib/supabase";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -36,7 +37,7 @@ const profileFormSchema = z.object({
 });
 
 export default function ProfilePage() {
-  const { user, login } = useAuth(); // Obter user do useAuth
+  const { user } = useAuth(); // Obter user do useAuth
   const { theme, toggleTheme, language, setLanguage } = useSettings();
   const { t } = useTranslation();
   const { updateEmployee } = useData(); // Obter updateEmployee do useData
@@ -101,12 +102,13 @@ export default function ProfilePage() {
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating profile:", error);
+      const message = error instanceof Error ? error.message : "Failed to update profile. Please try again.";
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to update profile. Please try again.",
+        description: message,
       });
     } finally {
       setIsSubmitting(false);

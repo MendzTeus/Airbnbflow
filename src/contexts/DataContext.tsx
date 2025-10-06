@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Property, Employee, Checklist, AccessCode, MaintenanceRequest, CalendarEvent } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { v4 as uuidv4 } from 'uuid'; // Para gerar IDs no front-end se o DB não tiver um default
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DataContextType {
   properties: Record<string, Property>;
@@ -60,6 +60,8 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// Fast refresh requires this hook to be exported with the provider; suppressing the lint rule for this export.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useDataContext = () => {
   const context = useContext(DataContext);
   if (!context) {
@@ -75,28 +77,71 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [accessCodes, setAccessCodes] = useState<Record<string, AccessCode>>({});
   const [maintenanceRequests, setMaintenanceRequests] = useState<Record<string, MaintenanceRequest>>({});
   const [events, setEvents] = useState<Record<string, CalendarEvent>>({});
+  const { user, isLoading: authLoading } = useAuth();
 
-  const fetchData = async <T extends { id: string }>(tableName: string, setter: (data: Record<string, T>) => void) => {
-    const { data, error } = await supabase.from(tableName).select('*');
-    if (error) {
-      console.error(`Erro ao buscar dados de ${tableName}:`, error);
-    } else {
+  useEffect(() => {
+    let isActive = true;
+
+    const resetData = () => {
+      if (!isActive) return;
+      setProperties({});
+      setEmployees({});
+      setChecklists({});
+      setAccessCodes({});
+      setMaintenanceRequests({});
+      setEvents({});
+    };
+
+    const fetchTable = async <T extends { id: string }>(
+      tableName: string,
+      setter: (data: Record<string, T>) => void
+    ) => {
+      const { data, error } = await supabase.from(tableName).select("*");
+      if (error) {
+        console.error(`Erro ao buscar dados de ${tableName}:`, error);
+        return;
+      }
+
+      if (!isActive) return;
+
       const dataMap = (data || []).reduce((acc, item) => {
         acc[item.id] = item as T;
         return acc;
       }, {} as Record<string, T>);
       setter(dataMap);
-    }
-  };
+    };
 
-  useEffect(() => {
-    fetchData<Property>('properties', setProperties);
-    fetchData<Employee>('employees', setEmployees);
-    fetchData<Checklist>('checklists', setChecklists);
-    fetchData<AccessCode>('access_codes', setAccessCodes);
-    fetchData<MaintenanceRequest>('maintenance_requests', setMaintenanceRequests);
-    fetchData<CalendarEvent>('calendar_events', setEvents);
-  }, []);
+    const fetchAll = async () => {
+      await Promise.all([
+        fetchTable<Property>("properties", setProperties),
+        fetchTable<Employee>("employees", setEmployees),
+        fetchTable<Checklist>("checklists", setChecklists),
+        fetchTable<AccessCode>("access_codes", setAccessCodes),
+        fetchTable<MaintenanceRequest>("maintenance_requests", setMaintenanceRequests),
+        fetchTable<CalendarEvent>("calendar_events", setEvents),
+      ]);
+    };
+
+    if (authLoading) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    if (!user) {
+      resetData();
+      return () => {
+        isActive = false;
+      };
+    }
+
+    resetData();
+    fetchAll();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user, authLoading]);
 
   // --- Funções Helper para Obter Itens por ID ---
   const getPropertyById = (id: string) => properties[id];

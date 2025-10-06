@@ -44,7 +44,11 @@ export default function EmployeesPage() {
   );
 
   const handleDelete = async (id: string) => {
-    await removeEmployee(id);
+    try {
+      await removeEmployee(id);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (

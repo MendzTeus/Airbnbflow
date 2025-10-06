@@ -1,601 +1,410 @@
-// src/pages/properties/PropertyDetail.tsx
-import { useState, useMemo } from "react"; // Adicionado useMemo
-import { useParams, Link, useNavigate } from "react-router-dom";
+// src/pages/checklists/ChecklistForm.tsx
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslation } from "@/hooks/use-translation";
+import { useToast } from "@/hooks/use-toast";
+import { useData } from "@/hooks/use-data";
+import type { Checklist } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+
 import {
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from "@/components/ui/alert-dialog";
-import {
-  ChevronLeft,
-  Building,
-  Bed,
-  Bath,
-  MapPin,
-  Home,
-  Calendar,
-  Key,
-  ClipboardList,
-  Wrench,
-  Plus,
-  Edit,
-  Trash
-} from "lucide-react";
-import { format, parseISO } from "date-fns";
-// Removida importação de useProperties, pois getPropertyById e removeProperty virão de useData
-// import { useProperties } from "@/hooks/use-properties";
-import { useToast } from "@/hooks/use-toast";
-import { useData } from "@/hooks/use-data"; // Importar useData
-import { Property, CalendarEvent, AccessCode, MaintenanceRequest, Checklist } from "@/types"; // Mantido tipos
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
-export default function PropertyDetail() {
+const checklistItemSchema = z.object({
+  itemId: z.string().optional(),
+  text: z
+    .string({ required_error: "Checklist item text is required" })
+    .min(1, { message: "Checklist item text is required" }),
+  completed: z.boolean().optional(),
+});
+
+const checklistSchema = z.object({
+  propertyId: z
+    .string({ required_error: "Please select a property" })
+    .min(1, { message: "Please select a property" }),
+  items: z
+    .array(checklistItemSchema)
+    .min(1, { message: "Add at least one checklist item" }),
+});
+
+type ChecklistFormValues = z.infer<typeof checklistSchema>;
+
+const generateItemId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2, 11);
+
+const DEFAULT_CLEANING_TASKS = [
+  "Dust and wipe all surfaces",
+  "Vacuum or mop floors",
+  "Clean mirrors and windows",
+  "Refresh linens and towels",
+  "Empty trash bins",
+  "Sanitize kitchen counters",
+  "Check appliances are off",
+  "Restock toiletries",
+];
+
+export default function ChecklistForm() {
   const { id } = useParams<{ id: string }>();
+  const isEditMode = Boolean(id);
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { toast } = useToast();
-  // Obter getPropertyById e removeProperty diretamente do useData
-  // Além disso, obter todos os dados relacionados para filtrar localmente
+  const { user } = useAuth();
   const {
-    properties,
-    events,
-    accessCodes,
-    maintenanceRequests,
     checklists,
-    getPropertyById,
-    removeProperty
+    properties,
+    getChecklistById,
+    addChecklist,
+    updateChecklist,
   } = useData();
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingChecklist, setIsLoadingChecklist] = useState(isEditMode);
+  const [currentChecklist, setCurrentChecklist] = useState<Checklist | null>(
+    null,
+  );
 
-  // Load property data from context
-  const property = useMemo(() => {
-    return id ? getPropertyById(id) : null;
-  }, [id, properties, getPropertyById]); // Depende de 'properties' para re-renderizar se a lista de propriedades mudar
+  const form = useForm<ChecklistFormValues>({
+    resolver: zodResolver(checklistSchema),
+    defaultValues: {
+      propertyId: "",
+      items: [
+        ...DEFAULT_CLEANING_TASKS.map((task) => ({
+          itemId: generateItemId(),
+          text: task,
+          completed: false,
+        })),
+      ],
+    },
+  });
 
-  // Filtrar dados relacionados à propriedade atual
-  const filteredEvents = useMemo(() => {
-    return Object.values(events).filter(event => event.propertyId === id);
-  }, [id, events]);
+  const { control, reset, handleSubmit } = form;
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "items",
+  });
+  const watchedItems = useWatch({ control, name: "items" });
 
-  const filteredAccessCodes = useMemo(() => {
-    return Object.values(accessCodes).filter(code => code.propertyId === id);
-  }, [id, accessCodes]);
+  const completedCount = useMemo(
+    () => watchedItems?.filter((item) => item?.completed).length ?? 0,
+    [watchedItems],
+  );
+  const totalCount = watchedItems?.length ?? 0;
+  const progressValue = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  const filteredMaintenanceRequests = useMemo(() => {
-    return Object.values(maintenanceRequests).filter(request => request.propertyId === id);
-  }, [id, maintenanceRequests]);
+  useEffect(() => {
+    if (!isEditMode || !id) {
+      setIsLoadingChecklist(false);
+      return;
+    }
 
-  const filteredChecklists = useMemo(() => {
-    return Object.values(checklists).filter(checklist => checklist.propertyId === id);
-  }, [id, checklists]);
+    const existing = getChecklistById(id);
+    if (existing) {
+      setCurrentChecklist(existing);
+      reset({
+        propertyId: existing.propertyId,
+        items:
+          existing.items.length > 0
+            ? existing.items.map((item) => ({
+                itemId: item.id,
+                text: item.text,
+                completed: Boolean(item.completed),
+              }))
+            : [
+                {
+                  itemId: generateItemId(),
+                  text: "",
+                  completed: false,
+                },
+              ],
+      });
+      setIsLoadingChecklist(false);
+    } else if (Object.keys(checklists).length > 0) {
+      toast({
+        variant: "destructive",
+        title: "Checklist not found",
+        description: "The checklist you are trying to edit could not be found.",
+      });
+      navigate("/checklists");
+    }
+  }, [
+    isEditMode,
+    id,
+    getChecklistById,
+    reset,
+    checklists,
+    toast,
+    navigate,
+  ]);
 
+  const onSubmit = async (values: ChecklistFormValues) => {
+    setIsSubmitting(true);
 
-  // Handle property deletion
-  const handleDeleteProperty = async () => { // Tornar a função async
-    if (!id) return;
+    const preparedItems = values.items.map((item) => ({
+      id: item.itemId && item.itemId.length > 0 ? item.itemId : generateItemId(),
+      text: item.text,
+      completed: Boolean(item.completed),
+    }));
+
+    const propertyName = properties[values.propertyId]?.name ?? "Property";
+    const payload = {
+      propertyId: values.propertyId,
+      title: `${propertyName} – Cleaning Checklist (${format(new Date(), "PP")})`,
+      type: "checkin" as Checklist["type"],
+      assignedTo: user?.id,
+      items: preparedItems,
+    };
 
     try {
-      await removeProperty(id); // Chamar a função removeProperty do useData
-      toast({
-        title: "Property Deleted",
-        description: "The property has been deleted successfully.",
-      });
-      navigate("/properties");
-    } catch (error: any) {
+      if (isEditMode && id && currentChecklist) {
+        await updateChecklist({ ...currentChecklist, ...payload });
+        toast({
+          title: "Checklist updated",
+          description: "The checklist has been updated successfully.",
+        });
+      } else {
+        await addChecklist(payload);
+        toast({
+          title: "Checklist created",
+          description: "A new checklist has been created successfully.",
+        });
+      }
+
+      navigate("/checklists");
+    } catch (error) {
+      console.error("Error saving checklist", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to delete the property. Please try again.",
+        description: "Failed to save the checklist. Please try again.",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Carregamento: a página está carregando se a propriedade ainda não foi encontrada e os dados do contexto ainda não estão populados
-  const isLoading = Object.keys(properties).length === 0 && !property;
-
-  if (isLoading) {
-    // Pode usar um Skeleton aqui ou um spinner global se preferir
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!property) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold">Property Not Found</h2>
-          <p className="text-muted-foreground mt-2">
-            The property you're looking for doesn't exist or has been removed.
-          </p>
-          <Button asChild className="mt-4">
-            <Link to="/properties">
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back to Properties
-            </Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const propertyOptions = useMemo(() => Object.values(properties), [properties]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <Button variant="outline" size="sm" asChild className="mr-4">
-            <Link to="/properties">
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back
-            </Link>
-          </Button>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">{property.name}</h2>
-            <p className="text-muted-foreground mt-1 flex items-center">
-              <MapPin className="mr-1 h-4 w-4" />
-              {property.address}, {property.city}, {property.state} {property.zipCode}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex space-x-2">
-          <Button asChild variant="outline">
-            <Link to={`/properties/${id}/edit`}>
-              <Edit className="mr-2 h-4 w-4" /> Edit
-            </Link>
-          </Button>
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive">
-                <Trash className="mr-2 h-4 w-4" /> Delete
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the property
-                  and all associated data.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteProperty}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/checklists")}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="text-3xl font-bold tracking-tight">
+          {isEditMode ? t("common.edit") : t("checklists.newChecklist")}
+        </h2>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
-          <TabsTrigger value="access-codes">Access Codes</TabsTrigger>
-          <TabsTrigger value="checklists">Checklists</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardHeader>
+          <CardTitle>{isEditMode ? "Update cleaning checklist" : "New cleaning checklist"}</CardTitle>
+          <CardDescription>
+            {"Select the property you are cleaning and mark each task as you finish."}
+          </CardDescription>
+        </CardHeader>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Property Details</CardTitle>
-              </CardHeader>
-              <CardContent>
+        {isLoadingChecklist ? (
+          <CardContent className="flex items-center justify-center py-16">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-muted border-t-primary" />
+          </CardContent>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <CardContent className="space-y-6">
+                <FormField
+                  control={control}
+                  name="propertyId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("checklists.property")}</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a property" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {propertyOptions.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              {"No properties available"}
+                            </div>
+                          ) : (
+                            propertyOptions.map((property) => (
+                              <SelectItem key={property.id} value={property.id}>
+                                {property.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        {t("checklists.propertyDescription") ||
+                          "Choose which property this checklist belongs to."}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Separator />
+
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center">
-                      <Bed className="h-5 w-5 text-muted-foreground mr-2" />
-                      <div>
-                        <div className="text-sm text-muted-foreground">Bedrooms</div>
-                        <div className="font-medium">{property.bedrooms}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <Bath className="h-5 w-5 text-muted-foreground mr-2" />
-                      <div>
-                        <div className="text-sm text-muted-foreground">Bathrooms</div>
-                        <div className="font-medium">{property.bathrooms}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {property.region && (
-                    <div className="flex items-center">
-                      <Home className="h-5 w-5 text-muted-foreground mr-2" />
-                      <div>
-                        <div className="text-sm text-muted-foreground">Region</div>
-                        <div className="font-medium">{property.region}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1">Full Address</div>
-                    <div className="font-medium">
-                      {property.address}<br />
-                      {property.city}, {property.state} {property.zipCode}
-                    </div>
-                  </div>
-
-                  {property.description && (
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <div className="text-sm text-muted-foreground mb-1">Description</div>
-                      <div>{property.description}</div>
+                      <h3 className="text-lg font-semibold">Cleaning tasks</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Check each task as you finish it.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="font-medium">{completedCount}/{totalCount} done</span>
+                      <Progress value={progressValue} className="h-2 w-40" />
+                    </div>
+                  </div>
+
+                  {fields.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {"Add at least one item to the checklist."}
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {fields.map((field, index) => (
+                        <div
+                          key={field.id}
+                          className="rounded-md border p-4 space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Task {index + 1}</span>
+                            {fields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => remove(index)}
+                                aria-label="Remove item"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <FormField
+                            control={control}
+                            name={`items.${index}.text`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="sr-only">
+                                  {t("checklists.itemText") || "Item text"}
+                                </FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    rows={2}
+                                    placeholder="Describe the task"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={control}
+                            name={`items.${index}.completed`}
+                            render={({ field }) => (
+                              <FormItem className="flex items-center space-x-2">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={Boolean(field.value)}
+                                    onCheckedChange={(checked) =>
+                                      field.onChange(checked === true)
+                                    }
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                  Mark as already complete
+                                </FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      ))}
                     </div>
                   )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      append({
+                        itemId: generateItemId(),
+                        text: "",
+                        completed: false,
+                      })
+                    }
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Add custom task
+                  </Button>
                 </div>
               </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredEvents.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-6">No upcoming events</p>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredEvents.map((event) => (
-                      <div key={event.id} className="flex items-start">
-                        <div className="mr-4 p-2 border rounded-md">
-                          <Calendar className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{event.title}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {format(parseISO(event.startDate), "MMM d, yyyy 'at' h:mm a")} {/* Correção aqui */}
-                          </div>
-                          <Badge
-                            variant="secondary"
-                            className={`mt-1 ${event.type === 'cleaning' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
-                          >
-                            {event.type}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                    <Button asChild className="w-full" variant="outline">
-                      <Link to={`/calendar/new?propertyId=${id}`}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Event
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {property.imageUrl && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Property Image</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <img
-                  src={property.imageUrl}
-                  alt={property.name}
-                  className="w-full h-auto rounded-md object-cover"
-                />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* Calendar Tab */}
-        <TabsContent value="calendar" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Calendar Events</CardTitle>
-                <CardDescription>Scheduled events for this property</CardDescription>
-              </div>
-              <Button asChild>
-                <Link to={`/calendar/new?propertyId=${id}`}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Event
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {filteredEvents.length === 0 ? (
-                <p className="text-center text-muted-foreground py-10">
-                  No events scheduled for this property
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Date & Time</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEvents.map(event => (
-                      <TableRow key={event.id}>
-                        <TableCell className="font-medium">{event.title}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={event.type === 'cleaning' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}
-                          >
-                            {event.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(parseISO(event.startDate), "MMM d, yyyy 'at' h:mm a")} {/* Correção aqui */}
-                        </TableCell>
-                        <TableCell>{event.assignedTo || "-"}</TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="ghost" size="sm">
-                            {/* Link para o formulário de edição de evento, passando o ID do evento */}
-                            <Link to={`/calendar/${event.id}/edit`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Access Codes Tab */}
-        <TabsContent value="access-codes" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Access Codes</CardTitle>
-                <CardDescription>Door codes and access information</CardDescription>
-              </div>
-              <Button asChild>
-                <Link to={`/access-codes/new?propertyId=${id}`}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Code
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {filteredAccessCodes.length === 0 ? (
-                <p className="text-center text-muted-foreground py-10">
-                  No access codes for this property
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Code Name</TableHead>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Expiry Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAccessCodes.map(code => (
-                      <TableRow key={code.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center">
-                            <Key className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {code.name}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono">{code.code}</TableCell>
-                        <TableCell>
-                          {/* Mostrar data de expiração se houver */}
-                          {code.expiryDate
-                            ? format(parseISO(code.expiryDate), "MMM d, yyyy")
-                            : "No expiry date"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="ghost" size="sm">
-                            <Link to={`/access-codes/${code.id}/edit`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Checklists Tab */}
-        <TabsContent value="checklists" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Checklists</CardTitle>
-                <CardDescription>Cleaning and maintenance checklists</CardDescription>
-              </div>
-              <Button asChild>
-                <Link to={`/checklists/new?propertyId=${id}`}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Checklist
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {filteredChecklists.length === 0 ? (
-                <p className="text-center text-muted-foreground py-10">
-                  No checklists for this property
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Checklist</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Items</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredChecklists.map(checklist => {
-                      const completedItems = checklist.items.filter(item => item.completed).length;
-                      const totalItems = checklist.items.length;
-                      const isComplete = checklist.completedAt || (totalItems > 0 && completedItems === totalItems);
-
-                      return (
-                        <TableRow key={checklist.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center">
-                              <ClipboardList className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {checklist.title}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {checklist.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className={isComplete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
-                            >
-                              {isComplete ? 'Complete' : 'In Progress'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {completedItems} of {totalItems} items
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button asChild variant="ghost" size="sm">
-                              <Link to={`/checklists/${checklist.id}/edit`}>
-                                <Edit className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Maintenance Tab */}
-        <TabsContent value="maintenance" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Maintenance Requests</CardTitle>
-                <CardDescription>Repair and maintenance issues</CardDescription>
-              </div>
-              <Button asChild>
-                <Link to={`/maintenance/new?propertyId=${id}`}>
-                  <Plus className="mr-2 h-4 w-4" /> Report Issue
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {filteredMaintenanceRequests.length === 0 ? (
-                <p className="text-center text-muted-foreground py-10">
-                  No maintenance requests for this property
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Issue</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date Reported</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredMaintenanceRequests.map(request => (
-                      <TableRow key={request.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center">
-                            <Wrench className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {request.title}
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                            {request.description}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              request.priority === 'high' ? 'bg-red-100 text-red-800' :
-                              request.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }
-                          >
-                            {request.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              request.status === 'open' ? 'bg-blue-100 text-blue-800' :
-                              request.status === 'in-progress' ? 'bg-purple-100 text-purple-800' :
-                              'bg-green-100 text-green-800'
-                            }
-                          >
-                            {request.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(parseISO(request.createdAt), "MMM d, yyyy")} {/* Correção aqui */}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="ghost" size="sm">
-                            <Link to={`/maintenance/${request.id}/edit`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              <CardFooter className="flex justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/checklists")}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting
+                    ? t("common.loading")
+                    : isEditMode
+                    ? t("common.save")
+                    : t("common.create")}
+                </Button>
+              </CardFooter>
+            </form>
+          </Form>
+        )}
+      </Card>
     </div>
   );
 }

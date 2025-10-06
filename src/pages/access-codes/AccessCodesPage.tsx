@@ -1,5 +1,5 @@
 // src/pages/access-codes/AccessCodesPage.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/use-translation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,8 +21,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { AccessCode, Property } from "@/types";
-import { Plus, Search, Edit, Building } from "lucide-react";
+import { Plus, Search, Edit, Building, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
 
@@ -68,7 +67,11 @@ export default function AccessCodesPage() {
   });
 
   const handleDelete = async (id: string) => {
-    await removeAccessCode(id);
+    try {
+      await removeAccessCode(id);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
@@ -119,7 +122,7 @@ export default function AccessCodesPage() {
               <Building className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-2 text-lg font-semibold">No access codes found</h3>
               <p className="text-muted-foreground">
-                {searchQuery ? "Try adjusting your search terms" : "Add an access code to get started"}
+                {searchTerm ? "Try adjusting your search terms" : "Add an access code to get started"}
               </p>
             </div>
           ) : (

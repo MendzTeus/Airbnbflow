@@ -8,7 +8,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
   hasPermission: (action: string) => boolean;
 }
@@ -22,26 +21,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const fetchUser = async () => {
       setIsLoading(true);
-      const { data: { user: supabaseUser }, error } = await supabase.auth.getUser();
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          throw error;
+        }
 
-      if (error) {
-        console.error("Erro ao buscar usuário Supabase:", error);
-        setUser(null);
-      } else if (supabaseUser) {
-        setUser({
-          id: supabaseUser.id,
-          name: supabaseUser.user_metadata?.name || supabaseUser.email || "Usuário",
-          email: supabaseUser.email!,
-          phone: supabaseUser.user_metadata?.phone || "",
-          role: supabaseUser.user_metadata?.role as UserRole || "cleaner", // Cast para UserRole
-        });
-      } else {
-        setUser(null);
+        const supabaseUser = session?.user;
+        if (supabaseUser) {
+          setUser({
+            id: supabaseUser.id,
+            name: supabaseUser.user_metadata?.name || supabaseUser.email || "Usuário",
+            email: supabaseUser.email!,
+            phone: supabaseUser.user_metadata?.phone || "",
+            role: supabaseUser.user_metadata?.role as UserRole || "cleaner", // Cast para UserRole
+          });
+        } else {
+          setUser(null);
+        }
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
-    fetchUser();
+    void fetchUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -61,34 +64,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     return () => {
-      authListener.subscription.unsubscribe();
+      authListener?.subscription?.unsubscribe();
     };
   }, []);
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setIsLoading(false);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-  };
-
-  const register = async (name: string, email: string, password: string, role: UserRole) => {
-    setIsLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name, role },
-      },
-    });
-    setIsLoading(false);
-    if (error) throw error;
+    if (!data.session) {
+      throw new Error("Failed to establish session. Please try again.");
+    }
   };
 
   const logout = async () => {
-    setIsLoading(true);
     const { error } = await supabase.auth.signOut();
-    setIsLoading(false);
     if (error) throw error;
   };
 
@@ -108,7 +97,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         login,
-        register,
         logout,
         hasPermission,
       }}
@@ -118,6 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+// Fast refresh requires this hook to live alongside the provider; suppressing the lint rule for this export.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -23,7 +23,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to update property: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -34,7 +34,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to add property: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -48,7 +48,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to remove property: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -60,7 +60,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to update employee: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -71,7 +71,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to add employee: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -85,7 +85,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to remove employee: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -97,7 +97,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to update checklist: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -108,7 +108,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to add checklist: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -122,7 +122,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to remove checklist: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -134,7 +134,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to update event: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -145,7 +145,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to add event: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -159,7 +159,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to remove event: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -171,7 +171,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to update access code: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -182,7 +182,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to add access code: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -196,7 +196,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to remove access code: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -208,7 +208,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to update maintenance request: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -219,7 +219,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to add maintenance request: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 
@@ -233,7 +233,7 @@ export const useData = () => {
       return true;
     } catch (error) {
       notifyChange(`Failed to remove maintenance request: ${(error as Error).message}`, "error");
-      return false;
+      throw error;
     }
   };
 

@@ -187,21 +187,23 @@ function CalendarPage() {
   // Get events for the current view
   const currentViewEvents = useMemo(() => {
     switch (view) {
-      case "month":
+      case "month": {
         const start = startOfMonth(date);
         const end = endOfMonth(date);
         return filteredEvents.filter(event => {
           const eventStart = parseISO(event.startDate);
           return isWithinInterval(eventStart, { start, end });
         });
+      }
 
-      case "week":
+      case "week": {
         const weekStart = startOfWeek(date, { weekStartsOn: 0 });
         const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
         return filteredEvents.filter(event => {
           const eventStart = parseISO(event.startDate);
           return isWithinInterval(eventStart, { start: weekStart, end: weekEnd });
         });
+      }
 
       case "day":
         return filteredEvents.filter(event => {
@@ -307,10 +309,6 @@ function CalendarPage() {
 
     try {
       await addEvent(newEvent); // Usar a função addEvent do useData
-      toast({
-        title: "Event Added",
-        description: "Your event has been added to the calendar.",
-      });
 
       // Reset form and close dialog
       setQuickAddEvent({
@@ -325,11 +323,7 @@ function CalendarPage() {
       });
       setQuickAddOpen(false);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error adding event",
-        description: (error as Error).message,
-      });
+      console.error(error);
     }
   };
 
@@ -393,21 +387,13 @@ function CalendarPage() {
 
     try {
       await updateEvent(updatedEvent); // Usar a função updateEvent do useData
-      toast({
-        title: "Event Updated",
-        description: "Your event has been updated.",
-      });
 
       // Close dialog
       setEventDetailOpen(false);
       setSelectedEvent(null);
       setEditedEvent(null);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error updating event",
-        description: (error as Error).message,
-      });
+      console.error(error);
     }
   };
 
@@ -417,20 +403,12 @@ function CalendarPage() {
 
     try {
       await removeEvent(selectedEvent.id); // Usar a função removeEvent do useData
-      toast({
-        title: "Event Deleted",
-        description: "Your event has been deleted.",
-      });
 
       // Close dialog
       setEventDetailOpen(false);
       setSelectedEvent(null);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error deleting event",
-        description: (error as Error).message,
-      });
+      console.error(error);
     }
   };
 

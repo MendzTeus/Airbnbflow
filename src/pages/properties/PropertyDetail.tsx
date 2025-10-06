@@ -38,7 +38,6 @@ import {
   Bath,
   MapPin,
   Home,
-  Calendar,
   Key,
   ClipboardList,
   Wrench,
@@ -49,19 +48,16 @@ import {
 import { format, parseISO } from "date-fns";
 // Removida importação de useProperties, pois getPropertyById e removeProperty virão de useData
 // import { useProperties } from "@/hooks/use-properties";
-import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/hooks/use-data"; // Importar useData
-import { Property, CalendarEvent, AccessCode, MaintenanceRequest, Checklist } from "@/types"; // Mantido tipos
+import { Property, AccessCode, MaintenanceRequest, Checklist } from "@/types"; // Mantido tipos
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
   // Obter getPropertyById e removeProperty diretamente do useData
   // Além disso, obter todos os dados relacionados para filtrar localmente
   const {
     properties,
-    events,
     accessCodes,
     maintenanceRequests,
     checklists,
@@ -74,12 +70,7 @@ export default function PropertyDetail() {
   // Load property data from context
   const property = useMemo(() => {
     return id ? getPropertyById(id) : null;
-  }, [id, properties, getPropertyById]); // Depende de 'properties' para re-renderizar se a lista de propriedades mudar
-
-  // Filtrar dados relacionados à propriedade atual
-  const filteredEvents = useMemo(() => {
-    return Object.values(events).filter(event => event.propertyId === id);
-  }, [id, events]);
+  }, [id, getPropertyById]);
 
   const filteredAccessCodes = useMemo(() => {
     return Object.values(accessCodes).filter(code => code.propertyId === id);
@@ -100,17 +91,9 @@ export default function PropertyDetail() {
 
     try {
       await removeProperty(id); // Chamar a função removeProperty do useData
-      toast({
-        title: "Property Deleted",
-        description: "The property has been deleted successfully.",
-      });
       navigate("/properties");
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to delete the property. Please try again.",
-      });
+    } catch (error: unknown) {
+      console.error(error);
     }
   };
 
@@ -157,7 +140,7 @@ export default function PropertyDetail() {
             <h2 className="text-3xl font-bold tracking-tight">{property.name}</h2>
             <p className="text-muted-foreground mt-1 flex items-center">
               <MapPin className="mr-1 h-4 w-4" />
-              {property.address}, {property.city}, {property.state} {property.zipCode}
+              {property.address}, {property.city} {property.zipCode}
             </p>
           </div>
         </div>
@@ -195,7 +178,6 @@ export default function PropertyDetail() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="access-codes">Access Codes</TabsTrigger>
           <TabsTrigger value="checklists">Checklists</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
@@ -241,7 +223,7 @@ export default function PropertyDetail() {
                     <div className="text-sm text-muted-foreground mb-1">Full Address</div>
                     <div className="font-medium">
                       {property.address}<br />
-                      {property.city}, {property.state} {property.zipCode}
+                      {property.city} {property.zipCode}
                     </div>
                   </div>
 
@@ -255,44 +237,6 @@ export default function PropertyDetail() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredEvents.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-6">No upcoming events</p>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Limitar a 2 eventos para o overview */}
-                    {filteredEvents.slice(0, 2).map((event) => (
-                      <div key={event.id} className="flex items-start">
-                        <div className="mr-4 p-2 border rounded-md">
-                          <Calendar className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{event.title}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {format(parseISO(event.startDate), "MMM d, yyyy 'at' h:mm a")}
-                          </div>
-                          <Badge
-                            variant="secondary"
-                            className={`mt-1 ${event.type === 'cleaning' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
-                          >
-                            {event.type}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                    <Button asChild className="w-full" variant="outline">
-                      <Link to={`/calendar/new?propertyId=${id}`}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Event
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
 
           {property.imageUrl && (
@@ -309,69 +253,6 @@ export default function PropertyDetail() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        {/* Calendar Tab */}
-        <TabsContent value="calendar" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Calendar Events</CardTitle>
-                <CardDescription>Scheduled events for this property</CardDescription>
-              </div>
-              <Button asChild>
-                <Link to={`/calendar/new?propertyId=${id}`}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Event
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {filteredEvents.length === 0 ? (
-                <p className="text-center text-muted-foreground py-10">
-                  No events scheduled for this property
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Date & Time</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEvents.map(event => (
-                      <TableRow key={event.id}>
-                        <TableCell className="font-medium">{event.title}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={event.type === 'cleaning' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}
-                          >
-                            {event.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(parseISO(event.startDate), "MMM d, yyyy 'at' h:mm a")}
-                        </TableCell>
-                        <TableCell>{event.assignedTo || "-"}</TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="ghost" size="sm">
-                            {/* Link para o formulário de edição de evento, passando o ID do evento */}
-                            <Link to={`/calendar/${event.id}/edit`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Access Codes Tab */}

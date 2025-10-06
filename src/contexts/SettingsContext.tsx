@@ -53,6 +53,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// Fast refresh requires this hook to be exported with the provider; suppressing the lint rule for this export.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) {

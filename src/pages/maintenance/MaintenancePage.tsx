@@ -20,11 +20,11 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
-import { Plus, Building, FileEdit, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, Building, FileEdit, AlertTriangle, Trash2, Wrench } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "@/hooks/use-translation";
 import { useData } from "@/hooks/use-data";
-import { MaintenanceRequest, Property } from "@/types";
+import { MaintenanceRequest } from "@/types";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -94,7 +94,11 @@ export default function MaintenancePage() {
   };
 
   const handleDelete = async (id: string) => {
-    await removeMaintenanceRequest(id);
+    try {
+      await removeMaintenanceRequest(id);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const openRequestsCount = Object.values(maintenanceRequests).filter(r => r.status === "open").length;
