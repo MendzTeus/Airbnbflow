@@ -1,8 +1,11 @@
-// src/contexts/DataContext.tsx
+// =============================================
+// src/contexts/DataContext.tsx (VERSÃO CORRIGIDA)
+// =============================================
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Property, Employee, Checklist, AccessCode, MaintenanceRequest, CalendarEvent } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { fromSnakeToCamel, fromCamelToSnake } from "@/lib/supabase-helpers";
 
 interface DataContextType {
   properties: Record<string, Property>;
@@ -12,10 +15,6 @@ interface DataContextType {
   maintenanceRequests: Record<string, MaintenanceRequest>;
   events: Record<string, CalendarEvent>;
   
-  // Setters removidos da interface, pois a manipulação será via add/update/remove
-  // setProperties: (propertiesOrFunction: Record<string, Property> | ((prev: Record<string, Property>) => Record<string, Property>)) => void;
-  // ...
-
   getPropertyById: (id: string) => Property | undefined;
   getEmployeeById: (id: string) => Employee | undefined;
   getChecklistById: (id: string) => Checklist | undefined;
@@ -32,7 +31,6 @@ interface DataContextType {
   getEventsByPropertyId: (propertyId: string) => CalendarEvent[];
   getEventsByAssignee: (assigneeId: string) => CalendarEvent[];
 
-  // Funções CRUD com Supabase
   addProperty: (property: Partial<Property>) => Promise<Property>;
   updateProperty: (property: Property) => Promise<Property>;
   removeProperty: (id: string) => Promise<void>;
@@ -60,17 +58,15 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Fast refresh requires this hook to be exported with the provider; suppressing the lint rule for this export.
-// eslint-disable-next-line react-refresh/only-export-components
-export const useDataContext = () => {
+export function useDataContext(): DataContextType {
   const context = useContext(DataContext);
   if (!context) {
     throw new Error("useDataContext must be used within a DataProvider");
   }
   return context;
-};
+}
 
-export const DataProvider = ({ children }: { children: ReactNode }) => {
+export function DataProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Record<string, Property>>({});
   const [employees, setEmployees] = useState<Record<string, Employee>>({});
   const [checklists, setChecklists] = useState<Record<string, Checklist>>({});
@@ -104,10 +100,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       if (!isActive) return;
 
+      // 🔥 CONVERSÃO: snake_case (DB) → camelCase (TypeScript)
       const dataMap = (data || []).reduce((acc, item) => {
-        acc[item.id] = item as T;
+        const converted = fromSnakeToCamel<T>(item);
+        acc[converted.id] = converted;
         return acc;
       }, {} as Record<string, T>);
+      
       setter(dataMap);
     };
 
@@ -143,7 +142,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [user, authLoading]);
 
-  // --- Funções Helper para Obter Itens por ID ---
+  // --- Helper Functions ---
   const getPropertyById = (id: string) => properties[id];
   const getEmployeeById = (id: string) => employees[id];
   const getChecklistById = (id: string) => checklists[id];
@@ -151,7 +150,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const getMaintenanceRequestById = (id: string) => maintenanceRequests[id];
   const getEventById = (id: string) => events[id];
 
-  // --- Funções Helper para Obter Itens Filtrados ---
   const getPropertiesByRegion = (region: string) =>
     Object.values(properties).filter(p => p.region === region);
   
@@ -179,33 +177,51 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const getEventsByAssignee = (assigneeId: string) =>
     Object.values(events).filter(e => e.assignedTo === assigneeId);
 
-  // --- Funções para Manipular Dados (interagem com Supabase e atualizam o estado local) ---
+  // --- CRUD Operations with Conversion ---
 
-  // Propriedades
+  // Properties
   const addProperty = async (property: Partial<Property>): Promise<Property> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
     
-    // Supondo que o DB gera o ID e timestamps automaticamente.
-    // Incluí user_id aqui. Certifique-se de que sua tabela properties tem a coluna user_id.
-    const propertyToInsert = { ...property, user_id: user.id };
-    const { data, error } = await supabase.from('properties').insert([propertyToInsert]).select().single();
+    // 🔥 CONVERSÃO: camelCase (TypeScript) → snake_case (DB)
+    const propertyToInsert = fromCamelToSnake({ ...property, userId: user.id });
+    
+    const { data, error } = await supabase
+      .from('properties')
+      .insert([propertyToInsert])
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setProperties(prev => ({ ...prev, [data.id]: data as Property }));
-      return data as Property;
+      // 🔥 CONVERSÃO: snake_case (DB) → camelCase (TypeScript)
+      const converted = fromSnakeToCamel<Property>(data);
+      setProperties(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to add property, no data returned.");
   };
 
   const updateProperty = async (property: Property): Promise<Property> => {
-    // Supondo que 'updatedAt' seja atualizado automaticamente pelo DB ou no frontend
-    const propertyToUpdate = { ...property, updatedAt: new Date().toISOString() };
-    const { data, error } = await supabase.from('properties').update(propertyToUpdate).eq('id', property.id).select().single();
+    // 🔥 CONVERSÃO: camelCase → snake_case
+    const propertyToUpdate = fromCamelToSnake({ 
+      ...property, 
+      updatedAt: new Date().toISOString() 
+    });
+    
+    const { data, error } = await supabase
+      .from('properties')
+      .update(propertyToUpdate)
+      .eq('id', property.id)
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setProperties(prev => ({ ...prev, [data.id]: data as Property }));
-      return data as Property;
+      const converted = fromSnakeToCamel<Property>(data);
+      setProperties(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to update property, no data returned.");
   };
@@ -220,27 +236,46 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // Funcionários
+  // Employees
   const addEmployee = async (employee: Partial<Employee>): Promise<Employee> => {
-    // Supondo que o DB gera o ID e timestamps automaticamente.
-    // 'properties' é text[] no DB para simplificar.
-    const employeeToInsert = { ...employee, properties: employee.properties || [] };
-    const { data, error } = await supabase.from('employees').insert([employeeToInsert]).select().single();
+    const employeeToInsert = fromCamelToSnake({ 
+      ...employee, 
+      properties: employee.properties || [] 
+    });
+    
+    const { data, error } = await supabase
+      .from('employees')
+      .insert([employeeToInsert])
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setEmployees(prev => ({ ...prev, [data.id]: data as Employee }));
-      return data as Employee;
+      const converted = fromSnakeToCamel<Employee>(data);
+      setEmployees(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to add employee, no data returned.");
   };
 
   const updateEmployee = async (employee: Employee): Promise<Employee> => {
-    const employeeToUpdate = { ...employee, updatedAt: new Date().toISOString() }; // Add updatedAt to Employee type if not present
-    const { data, error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id).select().single();
+    const employeeToUpdate = fromCamelToSnake({ 
+      ...employee, 
+      updatedAt: new Date().toISOString() 
+    });
+    
+    const { data, error } = await supabase
+      .from('employees')
+      .update(employeeToUpdate)
+      .eq('id', employee.id)
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setEmployees(prev => ({ ...prev, [data.id]: data as Employee }));
-      return data as Employee;
+      const converted = fromSnakeToCamel<Employee>(data);
+      setEmployees(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to update employee, no data returned.");
   };
@@ -257,23 +292,44 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // Checklists
   const addChecklist = async (checklist: Partial<Checklist>): Promise<Checklist> => {
-    const checklistToInsert = { ...checklist, items: checklist.items || [] };
-    const { data, error } = await supabase.from('checklists').insert([checklistToInsert]).select().single();
+    const checklistToInsert = fromCamelToSnake({ 
+      ...checklist, 
+      items: checklist.items || [] 
+    });
+    
+    const { data, error } = await supabase
+      .from('checklists')
+      .insert([checklistToInsert])
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setChecklists(prev => ({ ...prev, [data.id]: data as Checklist }));
-      return data as Checklist;
+      const converted = fromSnakeToCamel<Checklist>(data);
+      setChecklists(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to add checklist, no data returned.");
   };
 
   const updateChecklist = async (checklist: Checklist): Promise<Checklist> => {
-    const checklistToUpdate = { ...checklist, updatedAt: new Date().toISOString() };
-    const { data, error } = await supabase.from('checklists').update(checklistToUpdate).eq('id', checklist.id).select().single();
+    const checklistToUpdate = fromCamelToSnake({ 
+      ...checklist, 
+      updatedAt: new Date().toISOString() 
+    });
+    
+    const { data, error } = await supabase
+      .from('checklists')
+      .update(checklistToUpdate)
+      .eq('id', checklist.id)
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setChecklists(prev => ({ ...prev, [data.id]: data as Checklist }));
-      return data as Checklist;
+      const converted = fromSnakeToCamel<Checklist>(data);
+      setChecklists(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to update checklist, no data returned.");
   };
@@ -290,22 +346,41 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // Access Codes
   const addAccessCode = async (accessCode: Partial<AccessCode>): Promise<AccessCode> => {
-    const { data, error } = await supabase.from('access_codes').insert([accessCode]).select().single();
+    const codeToInsert = fromCamelToSnake(accessCode);
+    
+    const { data, error } = await supabase
+      .from('access_codes')
+      .insert([codeToInsert])
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setAccessCodes(prev => ({ ...prev, [data.id]: data as AccessCode }));
-      return data as AccessCode;
+      const converted = fromSnakeToCamel<AccessCode>(data);
+      setAccessCodes(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to add access code, no data returned.");
   };
 
   const updateAccessCode = async (accessCode: AccessCode): Promise<AccessCode> => {
-    const accessCodeToUpdate = { ...accessCode, updatedAt: new Date().toISOString() };
-    const { data, error } = await supabase.from('access_codes').update(accessCodeToUpdate).eq('id', accessCode.id).select().single();
+    const codeToUpdate = fromCamelToSnake({ 
+      ...accessCode, 
+      updatedAt: new Date().toISOString() 
+    });
+    
+    const { data, error } = await supabase
+      .from('access_codes')
+      .update(codeToUpdate)
+      .eq('id', accessCode.id)
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setAccessCodes(prev => ({ ...prev, [data.id]: data as AccessCode }));
-      return data as AccessCode;
+      const converted = fromSnakeToCamel<AccessCode>(data);
+      setAccessCodes(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to update access code, no data returned.");
   };
@@ -322,22 +397,41 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // Maintenance Requests
   const addMaintenanceRequest = async (request: Partial<MaintenanceRequest>): Promise<MaintenanceRequest> => {
-    const { data, error } = await supabase.from('maintenance_requests').insert([request]).select().single();
+    const requestToInsert = fromCamelToSnake(request);
+    
+    const { data, error } = await supabase
+      .from('maintenance_requests')
+      .insert([requestToInsert])
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setMaintenanceRequests(prev => ({ ...prev, [data.id]: data as MaintenanceRequest }));
-      return data as MaintenanceRequest;
+      const converted = fromSnakeToCamel<MaintenanceRequest>(data);
+      setMaintenanceRequests(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to add maintenance request, no data returned.");
   };
 
   const updateMaintenanceRequest = async (request: MaintenanceRequest): Promise<MaintenanceRequest> => {
-    const requestToUpdate = { ...request, updatedAt: new Date().toISOString() };
-    const { data, error } = await supabase.from('maintenance_requests').update(requestToUpdate).eq('id', request.id).select().single();
+    const requestToUpdate = fromCamelToSnake({ 
+      ...request, 
+      updatedAt: new Date().toISOString() 
+    });
+    
+    const { data, error } = await supabase
+      .from('maintenance_requests')
+      .update(requestToUpdate)
+      .eq('id', request.id)
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setMaintenanceRequests(prev => ({ ...prev, [data.id]: data as MaintenanceRequest }));
-      return data as MaintenanceRequest;
+      const converted = fromSnakeToCamel<MaintenanceRequest>(data);
+      setMaintenanceRequests(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to update maintenance request, no data returned.");
   };
@@ -354,22 +448,41 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // Calendar Events
   const addEvent = async (event: Partial<CalendarEvent>): Promise<CalendarEvent> => {
-    const { data, error } = await supabase.from('calendar_events').insert([event]).select().single();
+    const eventToInsert = fromCamelToSnake(event);
+    
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .insert([eventToInsert])
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setEvents(prev => ({ ...prev, [data.id]: data as CalendarEvent }));
-      return data as CalendarEvent;
+      const converted = fromSnakeToCamel<CalendarEvent>(data);
+      setEvents(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to add event, no data returned.");
   };
 
   const updateEvent = async (event: CalendarEvent): Promise<CalendarEvent> => {
-    const eventToUpdate = { ...event, updatedAt: new Date().toISOString() };
-    const { data, error } = await supabase.from('calendar_events').update(eventToUpdate).eq('id', event.id).select().single();
+    const eventToUpdate = fromCamelToSnake({ 
+      ...event, 
+      updatedAt: new Date().toISOString() 
+    });
+    
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .update(eventToUpdate)
+      .eq('id', event.id)
+      .select()
+      .single();
+      
     if (error) throw error;
     if (data) {
-      setEvents(prev => ({ ...prev, [data.id]: data as CalendarEvent }));
-      return data as CalendarEvent;
+      const converted = fromSnakeToCamel<CalendarEvent>(data);
+      setEvents(prev => ({ ...prev, [converted.id]: converted }));
+      return converted;
     }
     throw new Error("Failed to update event, no data returned.");
   };
@@ -384,7 +497,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-
   return (
     <DataContext.Provider
       value={{
@@ -394,7 +506,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         accessCodes,
         maintenanceRequests,
         events,
-        // Funções de obtenção
         getPropertyById,
         getEmployeeById,
         getChecklistById,
@@ -409,7 +520,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         getMaintenanceRequestsByRegion,
         getEventsByPropertyId,
         getEventsByAssignee,
-        // Funções de manipulação de dados
         addProperty,
         updateProperty,
         removeProperty,
@@ -433,4 +543,4 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </DataContext.Provider>
   );
-};
+}

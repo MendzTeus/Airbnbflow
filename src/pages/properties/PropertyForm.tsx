@@ -195,8 +195,50 @@ export default function PropertyForm() {
     setZipLookupMessage("");
     setIsLookingUpZip(true);
 
-    const sanitizedZip = rawZip.replace(/\s+/g, "");
-    const candidateCountries = ["GB", "US", "CA", "BR", "AU"];
+    const normalizedZip = rawZip.toUpperCase();
+    const sanitizedZip = normalizedZip.replace(/\s+/g, "");
+    const candidateCountries = ["US", "CA", "BR", "AU"];
+
+    try {
+      const ukResponse = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(sanitizedZip)}`);
+      if (ukResponse.ok) {
+        const ukData = await ukResponse.json();
+        const result = ukData?.result;
+        if (result) {
+          const cityName = result.post_town || result.admin_district || result.parish;
+          const regionName = result.region || result.admin_county;
+          const derivedAddress = [
+            result.postcode,
+            cityName,
+            regionName,
+            result.country,
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          setFormData(prev => {
+            const nextCity = prev.city ? prev.city : cityName || prev.city;
+            const nextAddress = prev.address ? prev.address : derivedAddress || prev.address;
+            const nextRegion = prev.region ? prev.region : regionName;
+
+            return {
+              ...prev,
+              zipCode: result.postcode || prev.zipCode,
+              city: nextCity,
+              address: nextAddress,
+              region: nextRegion,
+            };
+          });
+
+          setZipLookupError("");
+          setZipLookupMessage(`Location found: ${result.postcode}${cityName ? `, ${cityName}` : ""}`);
+          setIsLookingUpZip(false);
+          return;
+        }
+      }
+    } catch (ukLookupError) {
+      // If the UK-specific lookup fails, fall back to the generic providers below.
+    }
 
     for (const country of candidateCountries) {
       try {
@@ -232,7 +274,7 @@ export default function PropertyForm() {
     }
 
     setIsLookingUpZip(false);
-    setZipLookupError("Unable to find address details for this postal code. Please fill the fields manually.");
+    setZipLookupError("Unable to find address details for this postcode. Please fill the fields manually.");
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -379,7 +421,7 @@ export default function PropertyForm() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="zipCode">ZIP Code*</Label>
+                <Label htmlFor="zipCode">Postcode*</Label>
                 <Input
                   id="zipCode"
                   name="zipCode"
@@ -394,12 +436,12 @@ export default function PropertyForm() {
                       void lookupAddressByZip();
                     }
                   }}
-                  placeholder="e.g. 33101"
+                  placeholder="e.g. M3 3EF"
                   required
                 />
                 {isFetchingSuggestions && (
                   <p className="text-xs text-muted-foreground flex items-center gap-2">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Searching postal codes…
+                    <Loader2 className="h-3 w-3 animate-spin" /> Searching postcodes…
                   </p>
                 )}
                 {!isFetchingSuggestions && zipSuggestions.length > 0 && (

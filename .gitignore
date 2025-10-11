@@ -1,6 +1,17 @@
-node_modules
+# Dependências
+node_modules/
+
+# Variáveis de ambiente
 .env
 .env.*
-.env.local
-.env.production
-.env.development
+!.env.example  # <- mantém o arquivo de exemplo visível no repositório
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build e cache (opcional, mas comum)
+dist/
+build/
+.cache/
