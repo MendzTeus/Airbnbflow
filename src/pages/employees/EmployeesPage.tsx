@@ -37,11 +37,20 @@ export default function EmployeesPage() {
   
   const employeesArray = Object.values(employees); // Converte o objeto de employees em um array
 
-  const filteredEmployees = employeesArray.filter(employee =>
-    employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    employee.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredEmployees = employeesArray.filter((employee) => {
+    if (!normalizedSearch) return true;
+
+    const name = employee.name?.toLowerCase() ?? "";
+    const email = employee.email?.toLowerCase() ?? "";
+    const role = employee.role?.toLowerCase?.() ?? "";
+
+    return (
+      name.includes(normalizedSearch) ||
+      email.includes(normalizedSearch) ||
+      role.includes(normalizedSearch)
+    );
+  });
 
   const handleDelete = async (id: string) => {
     try {
@@ -105,132 +114,181 @@ export default function EmployeesPage() {
         </div>
       ) : view === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEmployees.map((employee) => (
-            <Card key={employee.id} className="overflow-hidden">
-              <CardContent className="p-6">
-                <div className="text-center mb-4">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
-                    <span className="text-2xl font-semibold text-primary">
-                      {employee.name.split(" ").map(n => n[0]).join("")}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-lg mt-2">{employee.name}</h3>
-                  <Badge variant="outline" className="mt-1">
-                    {employee.role === "manager" ? "Property Manager" : "Cleaner"}
-                  </Badge>
-                </div>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center">
-                    <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span>{employee.email}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span>{employee.phone}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span>Started {new Date(employee.startDate).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Building className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span>Assigned to {employee.properties.length} properties</span>
-                  </div>
-                </div>
-                
-                <div className="mt-4 flex justify-between">
-                  <Link to={`/employees/${employee.id}`}>
-                    <Button variant="outline" size="sm">View Details</Button>
-                  </Link>
-                  
-                  {hasPermission("edit:employee") && (
-                    <div className="flex gap-2">
-                      <Link to={`/employees/${employee.id}/edit`}>
-                        <Button variant="outline" size="icon" className="h-8 w-8">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(employee.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+          {filteredEmployees.map((employee) => {
+            const displayName =
+              employee.name?.trim() ||
+              employee.email?.split("@")[0] ||
+              "Unnamed";
+            const initials = displayName
+              .split(/\s+/)
+              .filter(Boolean)
+              .map((part) => part[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase();
+            const roleLabel =
+              employee.role === "manager"
+                ? "Property Manager"
+                : employee.role === "cleaner"
+                ? "Cleaner"
+                : "—";
+            const propertyCount = Array.isArray(employee.properties)
+              ? employee.properties.length
+              : 0;
+            const startDateLabel = employee.startDate
+              ? new Date(employee.startDate).toLocaleDateString()
+              : "—";
+
+            return (
+              <Card key={employee.id} className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="text-center mb-4">
+                    <div className="w-20 h-20 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
+                      <span className="text-2xl font-semibold text-primary">
+                        {initials || "?"}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    <h3 className="font-semibold text-lg mt-2">{displayName}</h3>
+                    <Badge variant="outline" className="mt-1">
+                      {roleLabel}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center">
+                      <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>{employee.email || "—"}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>{employee.phone || "—"}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>Started {startDateLabel}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Building className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>Assigned to {propertyCount} properties</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex justify-between">
+                    <Link to={`/employees/${employee.id}`}>
+                      <Button variant="outline" size="sm">View Details</Button>
+                    </Link>
+
+                    {hasPermission("edit:employee") && (
+                      <div className="flex gap-2">
+                        <Link to={`/employees/${employee.id}/edit`}>
+                          <Button variant="outline" size="icon" className="h-8 w-8">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(employee.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredEmployees.map((employee) => (
-            <Card key={employee.id} className="overflow-hidden">
-              <div className="p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-xl font-semibold text-primary">
-                      {employee.name.split(" ").map(n => n[0]).join("")}
-                    </span>
-                  </div>
-                  
-                  <div className="flex-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-lg">{employee.name}</h3>
-                        <Badge variant="outline">
-                          {employee.role === "manager" ? "Property Manager" : "Cleaner"}
-                        </Badge>
+          {filteredEmployees.map((employee) => {
+            const displayName =
+              employee.name?.trim() ||
+              employee.email?.split("@")[0] ||
+              "Unnamed";
+            const initials = displayName
+              .split(/\s+/)
+              .filter(Boolean)
+              .map((part) => part[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase();
+            const roleLabel =
+              employee.role === "manager"
+                ? "Property Manager"
+                : employee.role === "cleaner"
+                ? "Cleaner"
+                : "—";
+            const propertyCount = Array.isArray(employee.properties)
+              ? employee.properties.length
+              : 0;
+
+            return (
+              <Card key={employee.id} className="overflow-hidden">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <span className="text-xl font-semibold text-primary">
+                        {initials || "?"}
+                      </span>
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg">{displayName}</h3>
+                          <Badge variant="outline">
+                            {roleLabel}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Link to={`/employees/${employee.id}`}>
+                            <Button variant="outline" size="sm">View Details</Button>
+                          </Link>
+                          
+                          {hasPermission("edit:employee") && (
+                            <>
+                              <Link to={`/employees/${employee.id}/edit`}>
+                                <Button variant="outline" size="sm">
+                                  <Edit className="mr-2 h-4 w-4" /> Edit
+                                </Button>
+                              </Link>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(employee.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                       
-                      <div className="flex gap-2">
-                        <Link to={`/employees/${employee.id}`}>
-                          <Button variant="outline" size="sm">View Details</Button>
-                        </Link>
-                        
-                        {hasPermission("edit:employee") && (
-                          <>
-                            <Link to={`/employees/${employee.id}/edit`}>
-                              <Button variant="outline" size="sm">
-                                <Edit className="mr-2 h-4 w-4" /> Edit
-                              </Button>
-                            </Link>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(employee.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
-                      <div className="flex items-center">
-                        <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{employee.email}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{employee.phone}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Building className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <span>Assigned to {employee.properties.length} properties</span>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                        <div className="flex items-center">
+                          <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{employee.email || "—"}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{employee.phone || "—"}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Building className="mr-2 h-4 w-4 text-muted-foreground" />
+                          <span>Assigned to {propertyCount} properties</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
