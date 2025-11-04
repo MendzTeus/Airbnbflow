@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Login() {
   const { isAuthenticated, login, isLoading } = useAuth();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,10 +22,10 @@ export default function Login() {
     setIsSubmitting(true);
     
     try {
-      await login(email, password);
+      await login(username, password);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Invalid email or password";
-      setError(message || "Invalid email or password");
+      const message = err instanceof Error ? err.message : "Invalid username or password";
+      setError(message || "Invalid username or password");
     } finally {
       setIsSubmitting(false);
     }
@@ -60,13 +60,12 @@ export default function Login() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                 />
               </div>

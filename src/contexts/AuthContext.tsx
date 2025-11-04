@@ -1,13 +1,13 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, UserRole } from "@/types";
-import { supabase } from "@/lib/supabase"; // Importe o cliente Supabase
+import { supabase } from "@/lib/supabase";
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (action: string) => boolean;
 }
@@ -17,6 +17,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // 🔥 NOVA FUNÇÃO: Busca o role da tabela employees
+  const fetchUserRole = async (email: string): Promise<UserRole> => {
+    try {
+      console.log('🔍 Buscando role para email:', email);
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select('role')
+        .eq('email', email)
+        .single();
+
+      console.log('📊 Resposta do Supabase:', { data, error });
+
+      if (error || !data) {
+        console.error('❌ Erro ao buscar role do usuário:', error);
+        return "cleaner"; // fallback
+      }
+
+      console.log('✅ Role encontrado:', data.role);
+      return data.role as UserRole;
+    } catch (err) {
+      console.error('❌ Exceção ao buscar role:', err);
+      return "cleaner";
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -28,13 +54,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const supabaseUser = session?.user;
-        if (supabaseUser) {
+        if (supabaseUser && supabaseUser.email) {
+          // 🔥 BUSCA O ROLE DA TABELA EMPLOYEES
+          const role = await fetchUserRole(supabaseUser.email);
+          
           setUser({
             id: supabaseUser.id,
             name: supabaseUser.user_metadata?.name || supabaseUser.email || "Usuário",
-            email: supabaseUser.email!,
+            email: supabaseUser.email,
             phone: supabaseUser.user_metadata?.phone || "",
-            role: supabaseUser.user_metadata?.role as UserRole || "cleaner", // Cast para UserRole
+            role: role, // 🔥 USA O ROLE DO BANCO DE DADOS
           });
         } else {
           setUser(null);
@@ -48,13 +77,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === "SIGNED_IN" && session?.user) {
+        if (event === "SIGNED_IN" && session?.user && session.user.email) {
+          // 🔥 BUSCA O ROLE DA TABELA EMPLOYEES
+          const role = await fetchUserRole(session.user.email);
+          
           setUser({
             id: session.user.id,
             name: session.user.user_metadata?.name || session.user.email || "Usuário",
-            email: session.user.email!,
+            email: session.user.email,
             phone: session.user.user_metadata?.phone || "",
-            role: session.user.user_metadata?.role as UserRole || "cleaner",
+            role: role, // 🔥 USA O ROLE DO BANCO DE DADOS
           });
         } else if (event === "SIGNED_OUT") {
           setUser(null);
@@ -68,8 +100,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const login = async (username: string, password: string) => {
+    // Resolve the email associated with the provided username before authenticating.
+    const { data: employee, error: employeeLookupError } = await supabase
+      .from('employees')
+      .select('email')
+      .eq('username', username)
+      .single();
+
+    if (employeeLookupError || !employee?.email) {
+      throw new Error("Usuário não encontrado.");
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: employee.email,
+      password,
+    });
+
     if (error) throw error;
     if (!data.session) {
       throw new Error("Failed to establish session. Please try again.");
