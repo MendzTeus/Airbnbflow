@@ -51,8 +51,6 @@ export default function PropertyForm() {
     address: "",
     city: "",
     zipCode: "",
-    bedrooms: 1,
-    bathrooms: 1,
     imageUrl: "",
     description: ""
   });
@@ -164,13 +162,6 @@ export default function PropertyForm() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleNumberChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 })); // Use parseFloat para banheiros
-  };
-
   const applyZipSuggestion = (suggestion: { postcode: string; city?: string; region?: string; country?: string }) => {
     setFormData(prev => ({
       ...prev,
@@ -304,8 +295,8 @@ export default function PropertyForm() {
     setSubmitting(true);
     
     try {
-      if (!formData.name || !formData.address || !formData.city || !formData.zipCode || formData.bedrooms === undefined || formData.bathrooms === undefined) {
-        throw new Error("Please fill in all required fields and ensure bedrooms/bathrooms are numbers.");
+      if (!formData.name || !formData.address || !formData.city || !formData.zipCode) {
+        throw new Error("Please fill in all required fields.");
       }
       
       if (isEditing) {
@@ -472,35 +463,6 @@ export default function PropertyForm() {
                 {!isLookingUpZip && zipLookupError && (
                   <p className="text-xs text-destructive">{zipLookupError}</p>
                 )}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="bedrooms">Bedrooms*</Label>
-                <Input
-                  id="bedrooms"
-                  name="bedrooms"
-                  type="number"
-                  min="0"
-                  value={formData.bedrooms ?? 0}
-                  onChange={handleNumberChange}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="bathrooms">Bathrooms*</Label>
-                <Input
-                  id="bathrooms"
-                  name="bathrooms"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={formData.bathrooms ?? 0}
-                  onChange={handleNumberChange}
-                  required
-                />
               </div>
             </div>
             

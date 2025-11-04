@@ -1,11 +1,10 @@
 // src/pages/properties/PropertiesPage.tsx
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building, Plus, Search, MapPin, Bed, Bath, Info, Edit, Trash2 } from "lucide-react";
+import { Building, Plus, Search, MapPin, Info, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/hooks/use-data"; // Importar useData
@@ -130,16 +129,11 @@ export default function PropertiesPage() {
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center">
-                      <Bed className="mr-1 h-4 w-4" />
-                      <span>{property.bedrooms} Beds</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Bath className="mr-1 h-4 w-4" />
-                      <span>{property.bathrooms} Baths</span>
-                    </div>
-                  </div>
+                  {property.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {property.description}
+                    </p>
+                  )}
                 </div>
               </CardContent>
               
@@ -186,10 +180,7 @@ export default function PropertiesPage() {
                 
                 <div className="flex flex-1 flex-col p-4">
                   <div className="space-y-2">
-                    <div className="flex items-start justify-between">
-                      <h3 className="font-semibold text-lg">{property.name}</h3>
-                      <Badge variant="outline">{`${property.bedrooms} bed / ${property.bathrooms} bath`}</Badge>
-                    </div>
+                    <h3 className="font-semibold text-lg">{property.name}</h3>
                     
                     <div className="flex items-center text-muted-foreground text-sm">
                       <MapPin className="mr-1 h-3.5 w-3.5" />

@@ -174,17 +174,22 @@ export default function EmployeesPage() {
                   </div>
 
                   <div className="mt-4 flex justify-between">
-                    <Link to={`/employees/${employee.id}`}>
-                      <Button variant="outline" size="sm">View Details</Button>
-                    </Link>
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={`/employees/${employee.id}`}>View Details</Link>
+                    </Button>
 
                     {hasPermission("edit:employee") && (
                       <div className="flex gap-2">
-                        <Link to={`/employees/${employee.id}/edit`}>
-                          <Button variant="outline" size="icon" className="h-8 w-8">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                        >
+                          <Link to={`/employees/${employee.id}/edit`}>
                             <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                         <Button 
                           variant="outline" 
                           size="icon" 
@@ -245,17 +250,19 @@ export default function EmployeesPage() {
                         </div>
                         
                         <div className="flex gap-2">
-                          <Link to={`/employees/${employee.id}`}>
-                            <Button variant="outline" size="sm">View Details</Button>
-                          </Link>
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`/employees/${employee.id}`}>
+                              View Details
+                            </Link>
+                          </Button>
                           
                           {hasPermission("edit:employee") && (
                             <>
-                              <Link to={`/employees/${employee.id}/edit`}>
-                                <Button variant="outline" size="sm">
+                              <Button asChild variant="outline" size="sm">
+                                <Link to={`/employees/${employee.id}/edit`}>
                                   <Edit className="mr-2 h-4 w-4" /> Edit
-                                </Button>
-                              </Link>
+                                </Link>
+                              </Button>
                               <Button 
                                 variant="outline" 
                                 size="sm"

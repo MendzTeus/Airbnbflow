@@ -80,8 +80,6 @@ async function main() {
     city: "Testville",
     region: "QA Region",
     zipCode: "M1 2AB",
-    bedrooms: 3,
-    bathrooms: 2,
     imageUrl: "https://example.com/image.jpg",
     description: "Inserted by Codex test script.",
     createdAt: isoNow(),

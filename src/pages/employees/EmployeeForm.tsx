@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Employee, Property, UserRole } from "@/types";
+import { Employee, UserRole } from "@/types";
 import { AlertCircle, ArrowLeft, Building, Users } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useData } from "@/hooks/use-data"; // Importar useData
@@ -32,7 +32,13 @@ export default function EmployeeForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
-  const { getEmployeeById, addEmployee, updateEmployee, properties: allProperties } = useData(); // Obter dados e funções do useData
+  const { 
+    getEmployeeById, 
+    addEmployee, 
+    updateEmployee, 
+    properties: allProperties,
+    employeesLoaded 
+  } = useData(); // Obter dados e funções do useData
   const { toast } = useToast();
   
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -49,28 +55,43 @@ export default function EmployeeForm() {
   const [error, setError] = useState("");
   
   useEffect(() => {
-    if (isEditing) {
-      const employee = getEmployeeById(id);
-      if (employee) {
-        setFormData({
-          ...employee,
-          startDate: new Date(employee.startDate).toISOString().split("T")[0] // Formata a data para input type="date"
-        });
-      } else {
-        setError("Employee not found");
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Employee not found.",
-        });
-        navigate("/employees"); // Redirecionar se não encontrar
-      }
+    if (!isEditing) {
       setLoading(false);
-    } else {
-      setLoading(false);
+      return;
     }
-  }, [id, isEditing, getEmployeeById, navigate, toast]);
-  
+
+    if (!id) return;
+
+    const employee = getEmployeeById(id);
+
+    if (employee) {
+      setFormData({
+        ...employee,
+        startDate: employee.startDate
+          ? new Date(employee.startDate).toISOString().split("T")[0]
+          : "",
+        properties: Array.isArray(employee.properties)
+          ? employee.properties
+          : []
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!employeesLoaded) {
+      return;
+    }
+
+    setError("Employee not found");
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: "Employee not found.",
+    });
+    setLoading(false);
+    navigate("/employees", { replace: true }); // Redirecionar se não encontrar
+  }, [id, isEditing, getEmployeeById, navigate, toast, employeesLoaded]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -109,10 +130,15 @@ export default function EmployeeForm() {
         throw new Error("Please enter a valid email address.");
       }
       
+      const payload = {
+        ...formData,
+        properties: formData.properties ?? []
+      };
+
       if (isEditing) {
-        await updateEmployee(formData as Employee); // Cast para Employee completo
+        await updateEmployee(payload as Employee); // Cast para Employee completo
       } else {
-        await addEmployee(formData); // Partial<Employee> é aceitável para adicionar
+        await addEmployee(payload); // Partial<Employee> é aceitável para adicionar
       }
       
       navigate("/employees");

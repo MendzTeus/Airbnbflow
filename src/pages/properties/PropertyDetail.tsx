@@ -34,8 +34,6 @@ import {
 import {
   ChevronLeft,
   Building,
-  Bed,
-  Bath,
   MapPin,
   Home,
   Key,
@@ -192,19 +190,13 @@ export default function PropertyDetail() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center">
-                      <Bed className="h-5 w-5 text-muted-foreground mr-2" />
-                      <div>
-                        <div className="text-sm text-muted-foreground">Bedrooms</div>
-                        <div className="font-medium">{property.bedrooms}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <Bath className="h-5 w-5 text-muted-foreground mr-2" />
-                      <div>
-                        <div className="text-sm text-muted-foreground">Bathrooms</div>
-                        <div className="font-medium">{property.bathrooms}</div>
+                  <div className="flex items-start">
+                    <MapPin className="h-5 w-5 text-muted-foreground mr-2 mt-0.5" />
+                    <div>
+                      <div className="text-sm text-muted-foreground">Location</div>
+                      <div className="font-medium">
+                        {property.address}<br />
+                        {property.city} {property.zipCode}
                       </div>
                     </div>
                   </div>
@@ -218,14 +210,6 @@ export default function PropertyDetail() {
                       </div>
                     </div>
                   )}
-
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1">Full Address</div>
-                    <div className="font-medium">
-                      {property.address}<br />
-                      {property.city} {property.zipCode}
-                    </div>
-                  </div>
 
                   {property.description && (
                     <div>

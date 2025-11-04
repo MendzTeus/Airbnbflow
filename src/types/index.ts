@@ -16,8 +16,6 @@ export interface Property {
   city: string;
   region?: string;
   zipCode: string;
-  bedrooms: number;
-  bathrooms: number;
   imageUrl?: string;
   description?: string;
   createdAt: string;

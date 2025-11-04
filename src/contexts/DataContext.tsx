@@ -2,14 +2,50 @@
 // src/contexts/DataContext.tsx (VERSÃO CORRIGIDA)
 // =============================================
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { Property, Employee, Checklist, AccessCode, MaintenanceRequest, CalendarEvent } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { fromSnakeToCamel, fromCamelToSnake } from "@/lib/supabase-helpers";
 
+const buildPropertyDbPayload = (
+  property: Partial<Property> & {
+    id: string;
+    userId?: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+) => {
+  const { userId, ...rest } = property;
+
+  const payload: Record<string, unknown> = {
+    ...rest,
+  };
+
+  if (userId) {
+    payload.userId = userId;
+  }
+
+  return fromCamelToSnake(payload);
+};
+
+type RawProperty = Record<string, unknown> & { id: string };
+
+const sanitizeProperty = <T extends { id: string }>(rawProperty: T): Property => {
+  const sanitized = { ...rawProperty } as Record<string, unknown>;
+
+  delete sanitized.bedroomCount;
+  delete sanitized.bathroomCount;
+  delete sanitized.bedrooms;
+  delete sanitized.bathrooms;
+
+  return sanitized as Property;
+};
+
 interface DataContextType {
   properties: Record<string, Property>;
   employees: Record<string, Employee>;
+  employeesLoaded: boolean;
   checklists: Record<string, Checklist>;
   accessCodes: Record<string, AccessCode>;
   maintenanceRequests: Record<string, MaintenanceRequest>;
@@ -69,6 +105,7 @@ export function useDataContext(): DataContextType {
 export function DataProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Record<string, Property>>({});
   const [employees, setEmployees] = useState<Record<string, Employee>>({});
+  const [employeesLoaded, setEmployeesLoaded] = useState(false);
   const [checklists, setChecklists] = useState<Record<string, Checklist>>({});
   const [accessCodes, setAccessCodes] = useState<Record<string, AccessCode>>({});
   const [maintenanceRequests, setMaintenanceRequests] = useState<Record<string, MaintenanceRequest>>({});
@@ -82,19 +119,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!isActive) return;
       setProperties({});
       setEmployees({});
+      setEmployeesLoaded(false);
       setChecklists({});
       setAccessCodes({});
       setMaintenanceRequests({});
       setEvents({});
     };
 
-    const fetchTable = async <T extends { id: string }>(
+    const fetchTable = async <
+      TRaw extends { id: string },
+      TMapped extends { id: string } = TRaw
+    >(
       tableName: string,
-      setter: (data: Record<string, T>) => void
+      setter: (data: Record<string, TMapped>) => void,
+      onLoaded?: () => void,
+      transform?: (item: TRaw) => TMapped
     ) => {
       const { data, error } = await supabase.from(tableName).select("*");
       if (error) {
         console.error(`Erro ao buscar dados de ${tableName}:`, error);
+        if (isActive && onLoaded) onLoaded();
         return;
       }
 
@@ -102,18 +146,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       // 🔥 CONVERSÃO: snake_case (DB) → camelCase (TypeScript)
       const dataMap = (data || []).reduce((acc, item) => {
-        const converted = fromSnakeToCamel<T>(item);
-        acc[converted.id] = converted;
+        const converted = fromSnakeToCamel<TRaw>(item);
+        const mapped = transform
+          ? transform(converted)
+          : (converted as unknown as TMapped);
+        acc[mapped.id] = mapped;
         return acc;
-      }, {} as Record<string, T>);
+      }, {} as Record<string, TMapped>);
       
       setter(dataMap);
+      if (onLoaded) onLoaded();
     };
 
     const fetchAll = async () => {
       await Promise.all([
-        fetchTable<Property>("properties", setProperties),
-        fetchTable<Employee>("employees", setEmployees),
+        fetchTable<RawProperty, Property>(
+          "properties",
+          setProperties,
+          undefined,
+          (converted) => sanitizeProperty(converted)
+        ),
+        fetchTable<Employee>("employees", setEmployees, () => setEmployeesLoaded(true)),
         fetchTable<Checklist>("checklists", setChecklists),
         fetchTable<AccessCode>("access_codes", setAccessCodes),
         fetchTable<MaintenanceRequest>("maintenance_requests", setMaintenanceRequests),
@@ -181,11 +234,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Properties
   const addProperty = async (property: Partial<Property>): Promise<Property> => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) {
+      throw authError;
+    }
     if (!user) throw new Error("User not authenticated.");
+
+    const now = new Date().toISOString();
+    const propertyWithDefaults = {
+      id: property.id ?? uuidv4(),
+      name: property.name ?? "",
+      address: property.address ?? "",
+      city: property.city ?? "",
+      region: property.region ?? "",
+      zipCode: property.zipCode ?? "",
+      imageUrl: property.imageUrl ?? "",
+      description: property.description ?? "",
+      createdAt: property.createdAt ?? now,
+      updatedAt: property.updatedAt ?? now,
+      userId: user.id,
+    };
     
-    // 🔥 CONVERSÃO: camelCase (TypeScript) → snake_case (DB)
-    const propertyToInsert = fromCamelToSnake({ ...property, userId: user.id });
+    // 🔥 CONVERSÃO: camelCase (TypeScript) → snake_case (DB) com nomes de coluna corretos
+    const propertyToInsert = buildPropertyDbPayload(propertyWithDefaults);
     
     const { data, error } = await supabase
       .from('properties')
@@ -193,21 +264,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .select()
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error("Failed to add property via Supabase:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw new Error(error.message || "Failed to add property.");
+    }
     if (data) {
       // 🔥 CONVERSÃO: snake_case (DB) → camelCase (TypeScript)
-      const converted = fromSnakeToCamel<Property>(data);
-      setProperties(prev => ({ ...prev, [converted.id]: converted }));
-      return converted;
+      const converted = fromSnakeToCamel<RawProperty>(data);
+      const normalized = sanitizeProperty(converted);
+      setProperties(prev => ({ ...prev, [normalized.id]: normalized }));
+      return normalized;
     }
     throw new Error("Failed to add property, no data returned.");
   };
 
   const updateProperty = async (property: Property): Promise<Property> => {
-    // 🔥 CONVERSÃO: camelCase → snake_case
-    const propertyToUpdate = fromCamelToSnake({ 
-      ...property, 
-      updatedAt: new Date().toISOString() 
+    const now = new Date().toISOString();
+    const propertyToUpdate = buildPropertyDbPayload({ 
+      ...property,
+      updatedAt: now,
+      createdAt: property.createdAt ?? now,
+      userId: (property as Property & { userId?: string }).userId,
+      id: property.id,
     });
     
     const { data, error } = await supabase
@@ -219,9 +301,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       
     if (error) throw error;
     if (data) {
-      const converted = fromSnakeToCamel<Property>(data);
-      setProperties(prev => ({ ...prev, [converted.id]: converted }));
-      return converted;
+      const converted = fromSnakeToCamel<RawProperty>(data);
+      const normalized = sanitizeProperty(converted);
+      setProperties(prev => ({ ...prev, [normalized.id]: normalized }));
+      return normalized;
     }
     throw new Error("Failed to update property, no data returned.");
   };
@@ -502,6 +585,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       value={{
         properties,
         employees,
+        employeesLoaded,
         checklists,
         accessCodes,
         maintenanceRequests,
