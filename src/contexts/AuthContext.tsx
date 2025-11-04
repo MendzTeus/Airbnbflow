@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (action: string) => boolean;
 }
@@ -100,20 +100,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (username: string, password: string) => {
-    // Resolve the email associated with the provided username before authenticating.
-    const { data: employee, error: employeeLookupError } = await supabase
-      .from('employees')
-      .select('email')
-      .eq('username', username)
-      .single();
-
-    if (employeeLookupError || !employee?.email) {
-      throw new Error("Usuário não encontrado.");
-    }
-
+  const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: employee.email,
+      email,
       password,
     });
 

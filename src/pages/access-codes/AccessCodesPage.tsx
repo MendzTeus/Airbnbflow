@@ -22,7 +22,6 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Plus, Search, Edit, Building, Trash2 } from "lucide-react";
-import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton"; // Importar Skeleton
 
 // Removidos MOCK_ACCESS_CODES e MOCK_PROPERTIES
@@ -132,8 +131,9 @@ export default function AccessCodesPage() {
                   <TableHead>{t("accessCodes.property")}</TableHead>
                   <TableHead>{t("accessCodes.codeName")}</TableHead>
                   <TableHead>{t("accessCodes.code")}</TableHead>
-                  <TableHead>{t("accessCodes.expiryDate")}</TableHead>
-                  {hasPermission("edit:accessCodes") && <TableHead className="w-[100px]">{t("common.actions")}</TableHead>}
+                  {hasPermission("edit:accessCodes") && (
+                    <TableHead className="w-[100px]">{t("common.actions")}</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -145,11 +145,6 @@ export default function AccessCodesPage() {
                     </TableCell>
                     <TableCell>{code.name}</TableCell>
                     <TableCell className="font-mono">{code.code}</TableCell>
-                    <TableCell>
-                      {code.expiryDate 
-                        ? format(new Date(code.expiryDate), "MMM dd, yyyy") 
-                        : t("accessCodes.noExpiryDate")}
-                    </TableCell>
                     {hasPermission("edit:accessCodes") && (
                       <TableCell>
                         <Button variant="ghost" size="icon" asChild>
@@ -158,12 +153,12 @@ export default function AccessCodesPage() {
                           </Link>
                         </Button>
                         <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(code.id)}
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(code.id)}
                         >
-                            <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     )}

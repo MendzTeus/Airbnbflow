@@ -68,7 +68,6 @@ export interface AccessCode {
   name: string;
   code: string;
   propertyId: string;
-  expiryDate?: string;
   createdAt: string;
   updatedAt: string;
 }

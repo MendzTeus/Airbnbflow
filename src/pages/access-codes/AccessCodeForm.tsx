@@ -33,13 +33,9 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Property } from "@/types";
-import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 // Removido MOCK_PROPERTIES
 
@@ -60,8 +56,6 @@ const accessCodeSchema = z.object({
   .min(4, {
     message: "Code must be at least 4 characters",
   }),
-  noExpiry: z.boolean().default(false),
-  expiresAt: z.date().optional(),
 });
 
 export default function AccessCodeForm() {
@@ -78,8 +72,6 @@ export default function AccessCodeForm() {
       propertyId: "",
       name: "",
       code: "",
-      noExpiry: false,
-      expiresAt: undefined,
     },
   });
 
@@ -91,8 +83,6 @@ export default function AccessCodeForm() {
           propertyId: accessCode.propertyId,
           name: accessCode.name,
           code: accessCode.code,
-          noExpiry: !accessCode.expiryDate,
-          expiresAt: accessCode.expiryDate ? new Date(accessCode.expiryDate) : undefined,
         });
       } else {
         toast({
@@ -109,15 +99,10 @@ export default function AccessCodeForm() {
     setIsSubmitting(true);
     
     try {
-      const accessCodeData = {
-        ...values,
-        expiryDate: values.noExpiry ? undefined : values.expiresAt?.toISOString(),
-      };
-
       if (isEditMode) {
-        await updateAccessCode({ ...accessCodeData, id: id } as AccessCode);
+        await updateAccessCode({ ...values, id: id } as AccessCode);
       } else {
-        await addAccessCode(accessCodeData);
+        await addAccessCode(values);
       }
 
       navigate("/access-codes");
@@ -127,8 +112,6 @@ export default function AccessCodeForm() {
       setIsSubmitting(false);
     }
   };
-
-  const noExpiry = form.watch("noExpiry");
 
   return (
     <div className="space-y-6">
@@ -192,8 +175,6 @@ export default function AccessCodeForm() {
                 )}
               />
 
-              <Separator />
-
               <FormField
                 control={form.control}
                 name="name"
@@ -227,78 +208,6 @@ export default function AccessCodeForm() {
                   </FormItem>
                 )}
               />
-
-              <Separator />
-
-              <FormField
-                control={form.control}
-                name="noExpiry"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        {t("accessCodes.noExpiryDate")}
-                      </FormLabel>
-                      <FormDescription>
-                        {t("accessCodes.noExpiryDate")} {t("common.for")} {t("accessCodes.title").toLowerCase()}
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              {!noExpiry && (
-                <FormField
-                  control={form.control}
-                  name="expiresAt"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>{t("accessCodes.expiryDate")}</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={
-                                !field.value ? "text-muted-foreground" : ""
-                              }
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date < new Date() ||
-                              date > new Date(new Date().setFullYear(new Date().getFullYear() + 1))
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        {t("accessCodes.expiryDate")} {t("common.for")} {t("accessCodes.title").toLowerCase()}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button 

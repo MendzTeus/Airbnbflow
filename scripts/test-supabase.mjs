@@ -115,7 +115,6 @@ async function main() {
     name: "Codex Test Access",
     code: "CODEX1234",
     propertyId,
-    expiryDate: isoNow(),
     createdAt: isoNow(),
     updatedAt: isoNow(),
   };

@@ -91,8 +91,6 @@ const EN = {
   "accessCodes.property": "Property",
   "accessCodes.codeName": "Code Name",
   "accessCodes.code": "Code",
-  "accessCodes.expiryDate": "Expiry Date",
-  "accessCodes.noExpiryDate": "No Expiry Date",
   "accessCodes.newCode": "New Access Code",
   
   "maintenance.title": "Maintenance",
@@ -287,8 +285,6 @@ const PT_BR = {
   "accessCodes.property": "Propriedade",
   "accessCodes.codeName": "Nome do Código",
   "accessCodes.code": "Código",
-  "accessCodes.expiryDate": "Data de Expiração",
-  "accessCodes.noExpiryDate": "Sem Data de Expiração",
   "accessCodes.newCode": "Novo Código de Acesso",
   
   "maintenance.title": "Manutenção",

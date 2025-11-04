@@ -100,8 +100,6 @@ export type TranslationKey =
   | "accessCodes.property"
   | "accessCodes.codeName"
   | "accessCodes.code"
-  | "accessCodes.expiryDate"
-  | "accessCodes.noExpiryDate"
   | "accessCodes.newCode"
   
   | "maintenance.title"

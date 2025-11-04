@@ -264,7 +264,6 @@ export default function PropertyDetail() {
                     <TableRow>
                       <TableHead>Code Name</TableHead>
                       <TableHead>Code</TableHead>
-                      <TableHead>Expiry Date</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -278,11 +277,6 @@ export default function PropertyDetail() {
                           </div>
                         </TableCell>
                         <TableCell className="font-mono">{code.code}</TableCell>
-                        <TableCell>
-                          {code.expiryDate
-                            ? format(parseISO(code.expiryDate), "MMM d, yyyy")
-                            : "No expiry date"}
-                        </TableCell>
                         <TableCell className="text-right">
                           <Button asChild variant="ghost" size="sm">
                             <Link to={`/access-codes/${code.id}/edit`}>
