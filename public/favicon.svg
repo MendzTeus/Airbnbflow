@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>MCRh AirbnbFlow</title>
+  <defs>
+    <linearGradient id="arrowGradient" x1="8" y1="56" x2="60" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1d4ed8" />
+      <stop offset="1" stop-color="#38bdf8" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0f172a" />
+  <path d="M12 33.5 32 17l20 16.5v18.5h-12V40H24v11.5H12z" fill="#f8fafc" />
+  <path
+    d="M12 43c12.5-9.5 22-16 32.5-19l-6-6L60 18v21l-6-6C45 43 31.5 52 12 57Z"
+    fill="url(#arrowGradient)"
+  />
+  <rect x="26" y="32" width="5" height="6" fill="#0f172a" rx="0.5" />
+  <rect x="33" y="32" width="5" height="6" fill="#0f172a" rx="0.5" />
+</svg>

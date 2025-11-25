@@ -92,8 +92,12 @@ export default function ChecklistsPage() {
         </div>
         
         {hasPermission("create:checklist") && (
-          <Button onClick={() => navigate("/checklists/new")}>
-            <Plus className="mr-2 h-4 w-4" /> Add Checklist
+          <Button
+            onClick={() => navigate("/checklists/new")}
+            className="self-start sm:self-auto flex items-center justify-center"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="sr-only">Add Checklist</span>
           </Button>
         )}
       </div>

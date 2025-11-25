@@ -27,13 +27,13 @@ export function MapView({ job }: MapViewProps) {
   const accuracy = position?.coords.accuracy;
 
   return (
-    <div className="rounded-xl overflow-hidden border bg-muted/10">
+    <div className="relative z-0 rounded-xl overflow-hidden border bg-muted/10">
       <MapContainer
         key={center.join(",")}
         center={center}
         zoom={16}
         scrollWheelZoom={false}
-        className="h-[280px] w-full"
+        className="relative z-0 h-[280px] w-full"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

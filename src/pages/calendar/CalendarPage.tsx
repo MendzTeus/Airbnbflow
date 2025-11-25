@@ -682,16 +682,17 @@ function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">{t("calendar.title")}</h2>
           <p className="text-muted-foreground mt-2">
             {t("calendar.description")}
           </p>
         </div>
-        <Button asChild>
-          <Link to="/calendar/new">
-            <Plus className="mr-2 h-4 w-4" /> New Event
+        <Button asChild className="self-start sm:self-auto">
+          <Link to="/calendar/new" className="flex items-center justify-center">
+            <Plus className="h-4 w-4" />
+            <span className="sr-only">New Event</span>
           </Link>
         </Button>
       </div>

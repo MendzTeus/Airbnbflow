@@ -134,6 +134,7 @@ export type TranslationKey =
   | "timeClock.selectedJob"
   | "timeClock.selectJobPlaceholder"
   | "timeClock.changeJob"
+  | "timeClock.noJobs"
   | "timeClock.linkAdjustmentsTitle"
   | "timeClock.linkAdjustmentsDescription"
   | "timeClock.linkTimesheetTitle"

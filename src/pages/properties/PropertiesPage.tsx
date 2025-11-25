@@ -63,8 +63,12 @@ export default function PropertiesPage() {
         </div>
         
         {hasPermission("create:property") && (
-          <Button onClick={() => navigate("/properties/new")}>
-            <Plus className="mr-2 h-4 w-4" /> Add Property
+          <Button
+            onClick={() => navigate("/properties/new")}
+            className="self-start sm:self-auto flex items-center justify-center"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="sr-only">Add Property</span>
           </Button>
         )}
       </div>

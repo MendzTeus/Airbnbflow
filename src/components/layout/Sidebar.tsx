@@ -37,7 +37,7 @@ interface SidebarProps {
 
 export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const { logout, user } = useAuth();
+  const { logout, user, isRoleLoading } = useAuth();
   const location = useLocation();
   const { theme, toggleTheme, language, setLanguage } = useSettings();
   const { t } = useTranslation();
@@ -131,6 +131,11 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
                 collapsed && "justify-center"
               )}
+              onClick={() => {
+                if (isMobile && toggleMobileSidebar) {
+                  toggleMobileSidebar();
+                }
+              }}
             >
               <item.icon size={20} className={collapsed ? "" : "mr-3"} />
               {!collapsed && <span>{item.name}</span>}
@@ -143,7 +148,7 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
         {!collapsed && user && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             <div className="font-medium text-sidebar-foreground">{user.name}</div>
-            <div>{user.role}</div>
+            <div>{isRoleLoading ? t("common.loading") : user.role}</div>
           </div>
         )}
         {/* Theme toggle */}
@@ -211,7 +216,12 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
         {/* Logout button */}
         <Button
           variant="ghost"
-          onClick={logout}
+          onClick={() => {
+            logout();
+            if (isMobile && toggleMobileSidebar) {
+              toggleMobileSidebar();
+            }
+          }}
           className={cn(
             "w-full flex items-center text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
             collapsed && "justify-center p-2"
@@ -222,7 +232,8 @@ export function Sidebar({ isMobile, toggleMobileSidebar }: SidebarProps) {
         </Button>
         {!collapsed && user && (
           <div className="mt-2 text-xs text-muted-foreground px-3">
-            {t("common.loggedInAs")} <span className="font-medium">{user.role}</span>
+            {t("common.loggedInAs")}{" "}
+            <span className="font-medium">{isRoleLoading ? t("common.loading") : user.role}</span>
           </div>
         )}
       </div>

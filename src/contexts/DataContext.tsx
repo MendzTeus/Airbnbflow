@@ -46,6 +46,7 @@ interface DataContextType {
   properties: Record<string, Property>;
   employees: Record<string, Employee>;
   employeesLoaded: boolean;
+  isLoading: boolean;
   checklists: Record<string, Checklist>;
   accessCodes: Record<string, AccessCode>;
   maintenanceRequests: Record<string, MaintenanceRequest>;
@@ -106,6 +107,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Record<string, Property>>({});
   const [employees, setEmployees] = useState<Record<string, Employee>>({});
   const [employeesLoaded, setEmployeesLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [checklists, setChecklists] = useState<Record<string, Checklist>>({});
   const [accessCodes, setAccessCodes] = useState<Record<string, AccessCode>>({});
   const [maintenanceRequests, setMaintenanceRequests] = useState<Record<string, MaintenanceRequest>>({});
@@ -159,7 +161,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     const fetchAll = async () => {
-      await Promise.all([
+      if (!isActive) return;
+      setIsLoading(true);
+
+      const essentialPromise = Promise.all([
         fetchTable<RawProperty, Property>(
           "properties",
           setProperties,
@@ -167,14 +172,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
           (converted) => sanitizeProperty(converted)
         ),
         fetchTable<Employee>("employees", setEmployees, () => setEmployeesLoaded(true)),
+        fetchTable<MaintenanceRequest>("maintenance_requests", setMaintenanceRequests),
+      ]);
+
+      const secondaryPromise = Promise.all([
         fetchTable<Checklist>("checklists", setChecklists),
         fetchTable<AccessCode>("access_codes", setAccessCodes),
-        fetchTable<MaintenanceRequest>("maintenance_requests", setMaintenanceRequests),
         fetchTable<CalendarEvent>("calendar_events", setEvents),
       ]);
+
+      try {
+        await essentialPromise;
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+
+      await secondaryPromise;
     };
 
     if (authLoading) {
+      setIsLoading(true);
       return () => {
         isActive = false;
       };
@@ -182,6 +201,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     if (!user) {
       resetData();
+      setIsLoading(false);
       return () => {
         isActive = false;
       };
@@ -586,6 +606,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         properties,
         employees,
         employeesLoaded,
+        isLoading,
         checklists,
         accessCodes,
         maintenanceRequests,

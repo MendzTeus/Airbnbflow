@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClipboardList, History, UploadCloud, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,21 +14,22 @@ import { MapView } from "./components/MapView";
 import { TotalsCard } from "./components/TotalsCard";
 import { OfflineNotice } from "./components/OfflineNotice";
 import { PrimaryActionButton, TimeClockAction } from "./components/PrimaryActionButton";
-import { JobSelectModal } from "./components/JobSelectModal";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandList,
 } from "@/components/ui/command";
-import { buildTimeClockPayload, validateAccuracy, validateAllowedWindow } from "@/lib/timeClock/events";
+import { buildTimeClockPayload, validateAccuracy, validateAllowedWindow, type EventValidationResult } from "@/lib/timeClock/events";
 import { isWithinGeofence } from "@/lib/timeClock/geo";
 import { decryptJson, hasWebCryptoSupport, deriveAesKey } from "@/lib/crypto/secureStorage";
 import type { JobSummary, SyncedTimeClockEvent } from "@/types/timeClock";
 import { upsertSyncedEvent, computeTotalsFromEvents } from "@/stores/timeClockStore";
 import { useTranslation } from "@/hooks/use-translation";
+import { useData } from "@/hooks/use-data";
 
 const MAX_BREAKS = 4;
 
@@ -51,9 +52,92 @@ export default function TimeClockPage() {
   const setTodaysTotals = useTimeClockStore((state) => state.setTodaysTotals);
   const encryptionKey = useTimeClockStore((state) => state.encryptionKey);
   const setEncryptionKey = useTimeClockStore((state) => state.setEncryptionKey);
+  const { properties } = useData();
 
   const { install, isSupported: canInstall } = useInstallPrompt();
   useGeolocationWatcher();
+
+  const fallbackJobs = useMemo(() => {
+    const entries = Object.values(properties ?? {});
+    if (!entries.length) return [];
+    const defaultLat = geoposition?.coords.latitude ?? -23.5505;
+    const defaultLng = geoposition?.coords.longitude ?? -46.6333;
+
+    return entries.map((property) => {
+      const meta = property as Record<string, unknown>;
+      const rawCode =
+        typeof meta.code === "string" && meta.code.trim()
+          ? (meta.code as string)
+          : typeof property.zipCode === "string" && property.zipCode.trim()
+            ? property.zipCode.replace(/\s+/g, "")
+            : property.name.slice(0, 10).replace(/\s+/g, "-");
+      const latitude =
+        typeof meta.latitude === "number"
+          ? (meta.latitude as number)
+          : typeof meta.lat === "number"
+            ? (meta.lat as number)
+            : defaultLat;
+      const longitude =
+        typeof meta.longitude === "number"
+          ? (meta.longitude as number)
+          : typeof meta.lng === "number"
+            ? (meta.lng as number)
+            : defaultLng;
+      const radiusCandidate =
+        typeof meta.geofence_radius_m === "number"
+          ? (meta.geofence_radius_m as number)
+          : typeof meta.geofenceRadius === "number"
+            ? (meta.geofenceRadius as number)
+            : 1000;
+      const allowedStart =
+        typeof meta.allowed_start === "string"
+          ? (meta.allowed_start as string)
+          : typeof meta.allowedStart === "string"
+            ? (meta.allowedStart as string)
+            : "00:00";
+      const allowedEnd =
+        typeof meta.allowed_end === "string"
+          ? (meta.allowed_end as string)
+          : typeof meta.allowedEnd === "string"
+            ? (meta.allowedEnd as string)
+            : "00:00";
+
+      return {
+        id: property.id,
+        code: rawCode.toUpperCase(),
+        name: property.name,
+        client: property.city ?? "",
+        geofence_center: {
+          lat: Number.isFinite(latitude) ? latitude : defaultLat,
+          lng: Number.isFinite(longitude) ? longitude : defaultLng,
+        },
+        geofence_radius_m: Number.isFinite(radiusCandidate) && radiusCandidate > 0 ? radiusCandidate : 1000,
+        allowed_hours: {
+          start: allowedStart,
+          end: allowedEnd,
+        },
+        color_tag: typeof meta.color_tag === "string" ? (meta.color_tag as string) : undefined,
+        active: true,
+      } satisfies JobSummary;
+    });
+  }, [properties, geoposition]);
+
+  useEffect(() => {
+    if (!jobs.length && fallbackJobs.length) {
+      setJobs(fallbackJobs);
+    }
+  }, [jobs, fallbackJobs, setJobs]);
+
+  const availableJobs = useMemo(() => {
+    const source = jobs.length ? jobs : fallbackJobs;
+    return source.filter((job) => job.active !== false);
+  }, [jobs, fallbackJobs]);
+
+  useEffect(() => {
+    if (selectedJob && !availableJobs.some((job) => job.id === selectedJob.id)) {
+      setSelectedJob(undefined);
+    }
+  }, [availableJobs, selectedJob]);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,6 +241,23 @@ export default function TimeClockPage() {
     return /iphone|ipad|ipod/i.test(navigator.userAgent);
   }, []);
 
+  const resolveValidationMessage = useCallback(
+    (result: EventValidationResult | undefined) => {
+      if (!result) return undefined;
+      if (result.reasonKey) {
+        let message = t(result.reasonKey);
+        if (result.reasonParams) {
+          Object.entries(result.reasonParams).forEach(([key, value]) => {
+            message = message.replace(`{${key}}`, String(value));
+          });
+        }
+        return message;
+      }
+      return result.reason;
+    },
+    [t]
+  );
+
   async function handleAction(action: TimeClockAction) {
     if (!user) {
       toast({
@@ -191,7 +292,11 @@ export default function TimeClockPage() {
 
     const accuracyCheck = validateAccuracy(gps);
     if (!accuracyCheck.canProceed) {
-      toast({ title: t("timeClock.toast.precisionFailTitle"), description: accuracyCheck.reason, variant: "destructive" });
+      toast({
+        title: t("timeClock.toast.precisionFailTitle"),
+        description: resolveValidationMessage(accuracyCheck),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -203,7 +308,11 @@ export default function TimeClockPage() {
 
     const windowCheck = validateAllowedWindow(job, new Date());
     if (!windowCheck.canProceed) {
-      toast({ title: t("timeClock.toast.outsideWindowTitle"), description: windowCheck.reason, variant: "destructive" });
+      toast({
+        title: t("timeClock.toast.outsideWindowTitle"),
+        description: resolveValidationMessage(windowCheck),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -230,17 +339,27 @@ export default function TimeClockPage() {
         spoofCheckPassed: true,
       });
 
-      await postTimeEvent(payload, encryptionKey);
+      const response = await postTimeEvent(payload, encryptionKey);
       upsertSyncedEvent(payload, navigator.onLine ? "pending" : "pending");
+
+      if (response.status === 202) {
+        toast({
+          title: t("timeClock.toast.offlineQueuedTitle"),
+          description: t("timeClock.toast.offlineQueuedDescription"),
+        });
+      }
 
       if (action === "clock_out") {
         setSelectedJob(undefined);
       }
     } catch (error) {
-      console.error(error);
+      console.error("Failed to submit time clock action", error);
+      const description =
+        error instanceof Error ? error.message : t("timeClock.toast.submitErrorDescription");
       toast({
         title: t("timeClock.toast.submitErrorTitle"),
-        description: t("timeClock.toast.submitErrorDescription"),
+        description,
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -319,26 +438,32 @@ export default function TimeClockPage() {
 
       <Dialog open={propertyPickerOpen} onOpenChange={setPropertyPickerOpen}>
         <DialogContent className="sm:max-w-lg p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{t("timeClock.changeJob")}</DialogTitle>
+            <DialogDescription>{t("timeClock.selectJobPlaceholder")}</DialogDescription>
+          </DialogHeader>
           <Command className="h-96 w-full">
             <CommandInput placeholder={t("common.search") as string} />
-            <CommandEmpty>{t("common.loading")}</CommandEmpty>
-            <CommandGroup>
-              {jobs.map((job) => (
-                <CommandItem
-                  key={job.id}
-                  value={`${job.code} ${job.name}`}
-                  onSelect={() => {
-                    setSelectedJob(job);
-                    setPropertyPickerOpen(false);
-                  }}
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{job.code} — {job.name}</span>
-                    {job.client && <span className="text-xs text-muted-foreground">{job.client}</span>}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            <CommandList>
+              <CommandEmpty>{jobsLoading ? t("common.loading") : t("timeClock.noJobs")}</CommandEmpty>
+              <CommandGroup>
+                {availableJobs.map((job) => (
+                  <CommandItem
+                    key={job.id}
+                    value={`${job.code} ${job.name}`}
+                    onSelect={() => {
+                      setSelectedJob(job);
+                      setPropertyPickerOpen(false);
+                    }}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{job.code} — {job.name}</span>
+                      {job.client && <span className="text-xs text-muted-foreground">{job.client}</span>}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
           </Command>
         </DialogContent>
       </Dialog>

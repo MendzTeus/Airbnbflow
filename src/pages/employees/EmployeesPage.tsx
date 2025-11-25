@@ -71,8 +71,12 @@ export default function EmployeesPage() {
         </div>
         
         {hasPermission("create:employee") && (
-          <Button onClick={() => navigate("/employees/new")}>
-            <Plus className="mr-2 h-4 w-4" /> Add Employee
+          <Button
+            onClick={() => navigate("/employees/new")}
+            className="self-start sm:self-auto flex items-center justify-center"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="sr-only">Add Employee</span>
           </Button>
         )}
       </div>

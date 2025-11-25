@@ -93,6 +93,32 @@ export default function MaintenancePage() {
     }
   };
 
+  const getStatusLabel = (status: "open" | "in-progress" | "completed") => {
+    switch (status) {
+      case "open":
+        return t("maintenance.status.open");
+      case "in-progress":
+        return t("maintenance.status.inProgress");
+      case "completed":
+        return t("maintenance.status.completed");
+      default:
+        return status;
+    }
+  };
+
+  const getPriorityLabel = (priority: "low" | "medium" | "high") => {
+    switch (priority) {
+      case "low":
+        return t("maintenance.priority.low");
+      case "medium":
+        return t("maintenance.priority.medium");
+      case "high":
+        return t("maintenance.priority.high");
+      default:
+        return priority;
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       await removeMaintenanceRequest(id);
@@ -109,16 +135,19 @@ export default function MaintenancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">{t("maintenance.title")}</h2>
           <p className="text-muted-foreground mt-2">
             {t("maintenance.description")}
           </p>
         </div>
-        <Button asChild>
-          <Link to="/maintenance/new">
-            <Plus className="mr-2 h-4 w-4" /> {t("maintenance.newRequest")}
+        <Button asChild className="self-start sm:self-auto">
+          <Link to="/maintenance/new" className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="sr-only">
+              {t("maintenance.newRequest")}
+            </span>
           </Link>
         </Button>
       </div>
@@ -131,10 +160,10 @@ export default function MaintenancePage() {
           </CardDescription>
           <Tabs defaultValue="all" className="w-full mt-4" onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-4 w-full max-w-md">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="open">Open</TabsTrigger>
-              <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsTrigger value="all">{t("maintenance.filters.all")}</TabsTrigger>
+              <TabsTrigger value="open">{t("maintenance.filters.open")}</TabsTrigger>
+              <TabsTrigger value="in-progress">{t("maintenance.filters.inProgress")}</TabsTrigger>
+              <TabsTrigger value="completed">{t("maintenance.filters.completed")}</TabsTrigger>
             </TabsList>
           </Tabs>
         </CardHeader>
@@ -148,9 +177,11 @@ export default function MaintenancePage() {
             ) : filteredRequests.length === 0 ? (
                 <div className="text-center py-6">
                     <Wrench className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-2 text-lg font-semibold">No maintenance requests found</h3>
+                    <h3 className="mt-2 text-lg font-semibold">{t("maintenance.emptyTitle")}</h3>
                     <p className="text-muted-foreground">
-                        {activeTab === "all" ? "Add a new maintenance request to get started" : "Try adjusting your filters or search terms"}
+                        {activeTab === "all"
+                          ? t("maintenance.emptyDescriptionAll")
+                          : t("maintenance.emptyDescriptionFiltered")}
                     </p>
                 </div>
             ) : (
@@ -182,13 +213,12 @@ export default function MaintenancePage() {
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusBadge(request.status)} variant="secondary">
-                        {request.status === "in-progress" ? "In Progress" :
-                          request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                        {getStatusLabel(request.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge className={getPriorityBadge(request.priority)} variant="secondary">
-                        {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
+                        {getPriorityLabel(request.priority)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -201,26 +231,24 @@ export default function MaintenancePage() {
                         </Link>
                       </Button>
                       <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the maintenance request.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(request.id)}>
-                                        {t("common.delete")}
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t("maintenance.deleteTitle")}</AlertDialogTitle>
+                          <AlertDialogDescription>{t("maintenance.deleteDescription")}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(request.id)}>
+                            {t("common.delete")}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -233,7 +261,7 @@ export default function MaintenancePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Open Requests</CardTitle>
+            <CardTitle className="text-lg">{t("maintenance.summary.open")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
@@ -244,7 +272,7 @@ export default function MaintenancePage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">In Progress</CardTitle>
+            <CardTitle className="text-lg">{t("maintenance.summary.inProgress")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
@@ -255,7 +283,7 @@ export default function MaintenancePage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Completed</CardTitle>
+            <CardTitle className="text-lg">{t("maintenance.summary.completed")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
@@ -270,7 +298,7 @@ export default function MaintenancePage() {
           <CardHeader>
             <div className="flex items-center">
               <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-              <CardTitle className="text-red-500">High Priority Issues</CardTitle>
+              <CardTitle className="text-red-500">{t("maintenance.highPriorityTitle")}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -285,7 +313,7 @@ export default function MaintenancePage() {
                     </div>
                     <Button asChild variant="outline" size="sm" className="ml-4">
                       <Link to={`/maintenance/${request.id}`}>
-                        View
+                        {t("maintenance.view")}
                       </Link>
                     </Button>
                   </li>

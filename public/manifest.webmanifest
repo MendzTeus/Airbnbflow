@@ -1,6 +1,6 @@
 {
-  "name": "Airbnbflow Time Clock",
-  "short_name": "Time Clock",
+  "name": "MCRh AirbnbFlow",
+  "short_name": "MCRh",
   "description": "Registro de ponto com validação de localização e suporte offline.",
   "start_url": "/time-clock",
   "display": "standalone",

@@ -1,10 +1,5 @@
 
 import { lazy, Suspense } from "react";
-import AdminTimeClockPage from "./pages/admin/time-clock/AdminTimeClockPage";
-import TimeClockPage from "./pages/time-clock/TimeClockPage";
-import TimesheetPage from "./pages/time-clock/TimesheetPage";
-import AdjustmentsPage from "./pages/time-clock/AdjustmentsPage";
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -53,13 +48,15 @@ const MaintenanceForm = lazy(() => import("./pages/maintenance/MaintenanceForm")
 // Profile page
 const ProfilePage = lazy(() => import("./pages/profile/ProfilePage"));
 
+// Time clock pages
+const TimeClockPage = lazy(() => import("./pages/time-clock/TimeClockPage"));
+const TimesheetPage = lazy(() => import("./pages/time-clock/TimesheetPage"));
+const AdjustmentsPage = lazy(() => import("./pages/time-clock/AdjustmentsPage"));
+const AdminTimeClockPage = lazy(() => import("./pages/admin/time-clock/AdminTimeClockPage"));
+
 const queryClient = new QueryClient();
 
-const routeFallback = (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
-  </div>
-);
+const routeFallback = <div className="min-h-screen bg-background" />;
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

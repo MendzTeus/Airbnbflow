@@ -24,12 +24,36 @@ export function isWithinGeofence(gps: GpsReading, job: JobSummary) {
   };
 }
 
+function parseTimeToMinutes(value?: string) {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return undefined;
+  const [, rawHours, rawMinutes, rawSeconds] = match;
+  const hours = Number(rawHours);
+  const minutes = Number(rawMinutes);
+  const seconds = rawSeconds ? Number(rawSeconds) : 0;
+  if ([hours, minutes, seconds].some((part) => Number.isNaN(part))) return undefined;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return undefined;
+  return hours * 60 + minutes + seconds / 60;
+}
+
 export function isWithinAllowedWindow(job: JobSummary, date: Date) {
   if (!job.allowed_hours) return true;
-  const [startHour, startMinute] = job.allowed_hours.start.split(":").map(Number);
-  const [endHour, endMinute] = job.allowed_hours.end.split(":").map(Number);
+  const startMinutes = parseTimeToMinutes(job.allowed_hours.start);
+  const endMinutes = parseTimeToMinutes(job.allowed_hours.end);
+  if (startMinutes === undefined || endMinutes === undefined) {
+    return true;
+  }
+
+  if (startMinutes === endMinutes) {
+    return true;
+  }
+
   const minutes = date.getHours() * 60 + date.getMinutes();
-  const startMinutes = startHour * 60 + startMinute;
-  const endMinutes = endHour * 60 + endMinute;
-  return minutes >= startMinutes && minutes <= endMinutes;
+  if (startMinutes < endMinutes) {
+    return minutes >= startMinutes && minutes <= endMinutes;
+  }
+
+  return minutes >= startMinutes || minutes <= endMinutes;
 }

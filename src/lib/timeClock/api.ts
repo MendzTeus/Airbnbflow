@@ -10,6 +10,7 @@ import type {
 import { cacheJobs, putTimeEvent, updateTimeEventStatus } from "@/lib/db/timeClockDb";
 import { upsertSyncedEvent } from "@/stores/timeClockStore";
 import { encryptJson } from "@/lib/crypto/secureStorage";
+import { supabase } from "@/lib/supabase";
 
 const jobSchema = z.object({
   id: z.string(),
@@ -66,20 +67,66 @@ const adjustmentsResponseSchema = z.object({
 });
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? "/api";
+const FALLBACK_ORIGIN = "http://localhost";
+
+const getOrigin = () => {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  if (typeof globalThis !== "undefined") {
+    const possibleOrigin = (globalThis as { location?: { origin?: string } }).location?.origin;
+    if (possibleOrigin) {
+      return possibleOrigin;
+    }
+  }
+  return FALLBACK_ORIGIN;
+};
+
+function resolveApiUrl(path: string) {
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+
+  if (/^https?:\/\//i.test(apiBaseUrl)) {
+    const base = apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`;
+    return new URL(normalizedPath, base);
+  }
+
+  const origin = getOrigin();
+  const base = apiBaseUrl.startsWith("/") ? apiBaseUrl : `/${apiBaseUrl}`;
+  const baseWithSlash = base.endsWith("/") ? base : `${base}/`;
+
+  return new URL(normalizedPath, `${origin}${baseWithSlash}`);
+}
 
 const buildTimesheetUrl = (filters?: Partial<TimesheetFilters> & { user_id?: string; job_id?: string }) => {
-  const url = new URL(`${apiBaseUrl}/timesheet`);
-  if (!filters) return url;
+  const url = resolveApiUrl("timesheet");
+  if (!filters) {
+    return url;
+  }
+
   Object.entries(filters).forEach(([key, value]) => {
-    if (value) url.searchParams.set(key, String(value));
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
   });
+
   return url;
 };
 
 async function authenticatedFetch(input: RequestInfo, init: RequestInit = {}) {
   const headers = new Headers(init.headers ?? {});
   headers.set("Content-Type", "application/json");
-  const response = await fetch(input, { ...init, headers });
+  if (!headers.has("Authorization")) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+    } catch (error) {
+      console.warn("Não foi possível recuperar sessão do Supabase", error);
+    }
+  }
+  const response = await fetch(input, { ...init, headers, credentials: init.credentials ?? "include" });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`API request failed (${response.status}): ${body}`);
@@ -88,12 +135,12 @@ async function authenticatedFetch(input: RequestInfo, init: RequestInit = {}) {
 }
 
 export async function fetchJobs(params: { search?: string; page?: number; size?: number }, signal?: AbortSignal) {
-  const url = new URL(`${apiBaseUrl}/jobs`);
+  const url = resolveApiUrl("jobs");
   if (params.search) url.searchParams.set("search", params.search);
   if (params.page) url.searchParams.set("page", String(params.page));
   if (params.size) url.searchParams.set("size", String(params.size));
 
-  const response = await authenticatedFetch(url.toString(), { method: "GET", signal });
+  const response = await authenticatedFetch(url, { method: "GET", signal });
   const payload = jobsResponseSchema.parse(await response.json());
   cacheJobs(payload.data as JobSummary[]).catch((error) => console.warn("Falha ao cachear jobs", error));
   return payload;
@@ -101,7 +148,7 @@ export async function fetchJobs(params: { search?: string; page?: number; size?:
 
 export async function fetchTimesheet(filters: Partial<TimesheetFilters> & { user_id: string }, signal?: AbortSignal) {
   const url = buildTimesheetUrl(filters);
-  const response = await authenticatedFetch(url.toString(), { method: "GET", signal });
+  const response = await authenticatedFetch(url, { method: "GET", signal });
   const data = await response.json();
   const schema = z.object({ data: z.array(timesheetEntrySchema) });
   return schema.parse(data).data as TimesheetEntry[];
@@ -110,14 +157,14 @@ export async function fetchTimesheet(filters: Partial<TimesheetFilters> & { user
 export async function exportTimesheet(filters: Partial<TimesheetFilters> & { user_id: string; format: "csv" | "xlsx" | "pdf" }) {
   const url = buildTimesheetUrl(filters);
   url.searchParams.set("format", filters.format);
-  const response = await authenticatedFetch(url.toString(), { method: "GET" });
+  const response = await authenticatedFetch(url, { method: "GET" });
   const blob = await response.blob();
   const fileName = `timesheet.${filters.format === "xlsx" ? "xlsx" : filters.format}`;
   return { blob, fileName };
 }
 
 export async function postTimeEvent(payload: TimeClockEventPayload, encryptionKey?: CryptoKey) {
-  const endpoint = `${apiBaseUrl}/time/${mapEventTypeToEndpoint(payload.type)}`;
+  const endpoint = resolveApiUrl(`time/${mapEventTypeToEndpoint(payload.type)}`).toString();
   const responsePromise = authenticatedFetch(endpoint, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -160,12 +207,12 @@ function mapEventTypeToEndpoint(type: TimeClockEventType) {
 }
 
 export async function fetchAdjustments(signal?: AbortSignal) {
-  const response = await authenticatedFetch(`${apiBaseUrl}/adjustments`, { method: "GET", signal });
+  const response = await authenticatedFetch(resolveApiUrl("adjustments"), { method: "GET", signal });
   return adjustmentsResponseSchema.parse(await response.json());
 }
 
 export async function submitAdjustment(payload: Partial<AdjustmentRequestPayload>) {
-  const response = await authenticatedFetch(`${apiBaseUrl}/adjustments`, {
+  const response = await authenticatedFetch(resolveApiUrl("adjustments"), {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -173,7 +220,7 @@ export async function submitAdjustment(payload: Partial<AdjustmentRequestPayload
 }
 
 export async function updateAdjustmentStatus(id: string, action: "approve" | "reject", comment: string) {
-  const response = await authenticatedFetch(`${apiBaseUrl}/adjustments/${id}/${action}`, {
+  const response = await authenticatedFetch(resolveApiUrl(`adjustments/${id}/${action}`), {
     method: "PATCH",
     body: JSON.stringify({ comment }),
   });
@@ -181,17 +228,17 @@ export async function updateAdjustmentStatus(id: string, action: "approve" | "re
 }
 
 export async function adminListJobs(params: { search?: string; page?: number; size?: number } = {}) {
-  const url = new URL(`${apiBaseUrl}/admin/jobs`);
+  const url = resolveApiUrl("admin/jobs");
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
     url.searchParams.set(key, String(value));
   });
-  const response = await authenticatedFetch(url.toString(), { method: "GET" });
+  const response = await authenticatedFetch(url, { method: "GET" });
   return jobsResponseSchema.parse(await response.json());
 }
 
 export async function adminUpsertJob(job: Partial<JobSummary> & { id?: string }) {
-  const endpoint = job.id ? `${apiBaseUrl}/admin/jobs/${job.id}` : `${apiBaseUrl}/admin/jobs`;
+  const endpoint = resolveApiUrl(job.id ? `admin/jobs/${job.id}` : "admin/jobs").toString();
   const method = job.id ? "PUT" : "POST";
   const response = await authenticatedFetch(endpoint, {
     method,
@@ -201,7 +248,7 @@ export async function adminUpsertJob(job: Partial<JobSummary> & { id?: string })
 }
 
 export async function adminToggleJob(jobId: string, active: boolean) {
-  const response = await authenticatedFetch(`${apiBaseUrl}/admin/jobs/${jobId}/status`, {
+  const response = await authenticatedFetch(resolveApiUrl(`admin/jobs/${jobId}/status`), {
     method: "PATCH",
     body: JSON.stringify({ active }),
   });
@@ -209,7 +256,7 @@ export async function adminToggleJob(jobId: string, active: boolean) {
 }
 
 export async function adminAssignUsers(jobId: string, userIds: string[]) {
-  const response = await authenticatedFetch(`${apiBaseUrl}/admin/jobs/${jobId}/assignments`, {
+  const response = await authenticatedFetch(resolveApiUrl(`admin/jobs/${jobId}/assignments`), {
     method: "POST",
     body: JSON.stringify({ user_ids: userIds }),
   });

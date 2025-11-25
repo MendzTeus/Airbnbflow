@@ -2,26 +2,38 @@ import type { JobSummary, TimeClockEventPayload, TimeClockEventType, GpsReading 
 import { isWithinAllowedWindow } from "./geo";
 
 const ACCURACY_THRESHOLD = 100; // meters
+const enforceAllowedWindow =
+  (import.meta.env.VITE_ENFORCE_ALLOWED_WINDOW ?? "false").toString().toLowerCase() === "true";
 
 export interface EventValidationResult {
   canProceed: boolean;
   reason?: string;
+  reasonKey?: string;
+  reasonParams?: Record<string, string>;
 }
 
 export function validateAccuracy(gps: GpsReading, maxAccuracy = ACCURACY_THRESHOLD): EventValidationResult {
   if (gps.accuracy_m > maxAccuracy) {
+    const roundedAccuracy = Math.round(gps.accuracy_m).toString();
+    const limit = maxAccuracy.toString();
     return {
       canProceed: false,
-      reason: `Precisão do GPS (${Math.round(gps.accuracy_m)}m) acima do limite permitido (${maxAccuracy}m).`,
+      reasonKey: "timeClock.validation.accuracy",
+      reasonParams: { accuracy: roundedAccuracy, limit },
+      reason: `Precisão do GPS (${roundedAccuracy}m) acima do limite permitido (${limit}m).`,
     };
   }
   return { canProceed: true };
 }
 
 export function validateAllowedWindow(job: JobSummary, now: Date): EventValidationResult {
+  if (!enforceAllowedWindow) {
+    return { canProceed: true };
+  }
   if (!isWithinAllowedWindow(job, now)) {
     return {
       canProceed: false,
+      reasonKey: "timeClock.validation.window",
       reason: "Fora da janela de batida permitida para este Job.",
     };
   }
